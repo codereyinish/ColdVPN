@@ -170,9 +170,14 @@
 
       NUM_DATES=${#UNIQUE_DATES[@]}
 
-      # ── Output dates newest first ──
+      # ── Output dates newest first (Today and Yesterday only) ──
       for ((d=NUM_DATES-1; d>=0; d--)); do
           DATE="${UNIQUE_DATES[$d]}"
+
+          # Skip dates older than yesterday — older sessions still count in All time
+          if [ "$DATE" != "$TODAY" ] && [ "$DATE" != "$YESTERDAY" ]; then
+              continue
+          fi
 
           declare -a D_TIME D_RX D_TX
           D_COUNT=0
