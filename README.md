@@ -1,45 +1,77 @@
-# WireGuard Hotspot Bypass for Mac
+# WireGuard Hotspot Mac
 
-Automatically routes all traffic through your own WireGuard VPN whenever your Mac connects to an iPhone hotspot — bypassing AT&T's hotspot data detection.
+Automatically connects your Mac to your own private VPN server the moment you tether from your iPhone — and disconnects when you switch back to WiFi. No manual toggling. A menu bar widget shows your live data usage in real time.
+
+---
+
+## Why you'd want this
+
+**You work remotely and tether frequently**
+Your Mac traffic goes through your own server — not exposed on the carrier network. No VPN app subscription needed.
+
+**You want to know exactly how much data you're using**
+The menu bar widget tracks usage per session, per day, and all time. You always know how much you've consumed before hitting your limit.
+
+**You're tired of manually connecting your VPN every time you hotspot**
+This does it automatically. iPhone hotspot on → VPN up. Hotspot off → VPN down. You don't touch anything.
+
+**You travel and use cellular data on your Mac**
+Keep all your traffic private through your own server instead of relying on carrier infrastructure or public WiFi.
+
+---
+
+## What it looks like
+
+```
+WG ●  ↓8.33 MB  ↑47.60 MB          ← menu bar (live)
+─────────────────────────────
+🟢  Live   ↓8.33 MB   ↑47.60 MB  ▶
+─────────────────────────────
+📅  Today
+   Session 9   19:24:46   ↓2.73 MB   ↑2.81 MB
+   Session 8   19:04:19   ↓171 KB    ↑258 KB
+   ▸ 7 earlier session(s)            ▶
+📊  Day total  ↓20 MB    ↑77 MB     ▶
+─────────────────────────────
+📅  Yesterday (2026-05-27)  ↓181 MB  ↑41 MB  ▶
+─────────────────────────────
+🌐  All time   ↓201 MB   ↑119 MB    ▶
+```
+
+---
 
 ## How it works
 
-AT&T detects hotspot usage by checking the TTL (Time To Live) value of outgoing packets:
-- iPhone traffic: TTL = 64
-- Hotspot traffic: TTL = 63 (iPhone decrements it by 1)
-
-This tool sets your Mac's TTL to **65** before traffic leaves. The iPhone decrements it to **64** — AT&T sees it as regular phone traffic.
-
-The same fix is applied to IPv6 Hop Limit.
-
 ```
-iPhone Hotspot → Mac (TTL=65) → WireGuard Tunnel → Oracle VPS → Internet
-                                 AT&T sees TTL=64 ✓ (looks like phone)
+iPhone hotspot on
+      ↓
+Mac detects network change
+      ↓
+WireGuard tunnel connects to your server
+      ↓
+All traffic routes through your private server
+      ↓
+iPhone hotspot off → tunnel disconnects, session saved
 ```
 
-## Features
+Your server can be a **free** Oracle Cloud instance — free forever within their always-free tier.
 
-- ✅ Auto-connects WireGuard when iPhone hotspot is detected
-- ✅ Auto-disconnects when hotspot is gone
-- ✅ Fixes both IPv4 TTL and IPv6 Hop Limit
-- ✅ SwiftBar menu bar widget with live stats
-- ✅ Per-session usage tracking
-- ✅ Daily and all-time totals
+---
 
 ## Prerequisites
 
-- Mac with Apple Silicon or Intel
+- Mac (Apple Silicon or Intel)
 - [Homebrew](https://brew.sh)
-- [SwiftBar](https://swiftbar.app) (for the menu bar widget)
-- Your own WireGuard server (see Server Setup below)
+- [SwiftBar](https://swiftbar.app) — free menu bar app runner
+- Your own WireGuard server (Oracle Cloud free tier works great)
 
-## Server Setup (Oracle Cloud Free Tier)
+---
 
-Oracle Cloud offers a **free forever** VPS — no charges if you stay within limits.
+## Server Setup (Oracle Cloud — Free Forever)
 
 1. Create an [Oracle Cloud account](https://cloud.oracle.com)
-2. Create a free Ubuntu 22.04 instance (VM.Standard.A1.Flex — ARM, 1 OCPU, 1GB RAM)
-3. Open port **51820 UDP** in the instance's security list
+2. Launch a free Ubuntu 22.04 instance (VM.Standard.A1.Flex — 1 OCPU, 1GB RAM)
+3. Open port **51820 UDP** in the instance security list
 4. SSH into your server and run:
 
 ```bash
@@ -72,13 +104,14 @@ EOF
 # Start WireGuard
 systemctl enable --now wg-quick@wg0
 
-# Show your server public key (you'll need this for the Mac setup)
 echo "Server public key: $(cat /etc/wireguard/server_public.key)"
 ```
 
+---
+
 ## Mac Client Setup
 
-### 1. Install dependencies
+### 1. Install WireGuard tools
 
 ```bash
 brew install wireguard-tools
@@ -88,20 +121,10 @@ brew install wireguard-tools
 
 ```bash
 wg genkey | tee ~/.wg-client-private.key | wg pubkey > ~/.wg-client-public.key
-cat ~/.wg-client-public.key   # add this to your server's wg0.conf [Peer] section
+cat ~/.wg-client-public.key   # paste this into your server's [Peer] section
 ```
 
-### 3. Add your client to the server
-
-On your server, add to `/etc/wireguard/wg0.conf`:
-```ini
-[Peer]
-PublicKey = YOUR_CLIENT_PUBLIC_KEY
-AllowedIPs = 10.0.0.2/32
-```
-Then reload: `wg addconf wg0 <(wg-quick strip wg0)` or restart the service.
-
-### 4. Create client WireGuard config
+### 3. Create your WireGuard config
 
 ```bash
 sudo cp client/wg0.conf.example /opt/homebrew/etc/wireguard/wg0.conf
@@ -109,7 +132,7 @@ sudo nano /opt/homebrew/etc/wireguard/wg0.conf
 # Fill in: PrivateKey, server PublicKey, server IP
 ```
 
-### 5. Install the scripts
+### 4. Install scripts
 
 ```bash
 sudo cp client/wireguard-hotspot.sh /usr/local/bin/wireguard-hotspot.sh
@@ -117,44 +140,38 @@ sudo cp client/wg-stats /usr/local/bin/wg-stats
 sudo chmod +x /usr/local/bin/wireguard-hotspot.sh /usr/local/bin/wg-stats
 ```
 
-### 6. Set up the LaunchDaemon (auto-start on network change)
+### 5. Install the LaunchDaemon
 
 ```bash
 sudo cp client/com.wireguard.hotspot.plist /Library/LaunchDaemons/
 sudo launchctl load /Library/LaunchDaemons/com.wireguard.hotspot.plist
 ```
 
-### 7. Set up log file
+### 6. Create log file
 
 ```bash
 sudo touch /var/log/wg-usage.log
 sudo chmod 644 /var/log/wg-usage.log
 ```
 
-### 8. Allow passwordless sudo for WireGuard commands
+### 7. Allow passwordless sudo for WireGuard
 
 ```bash
 sudo visudo
-# Add this line:
+# Add:
 # %admin ALL=(ALL) NOPASSWD: /opt/homebrew/bin/wg, /opt/homebrew/bin/wg-quick
 ```
 
-### 9. Install the SwiftBar widget
+### 8. Set up SwiftBar widget
 
-1. Download and install [SwiftBar](https://swiftbar.app)
-2. Set your plugins folder when SwiftBar asks
-3. Copy the plugin:
+1. Install [SwiftBar](https://swiftbar.app) and choose a plugins folder
+2. Copy the plugin:
 ```bash
-cp client/wg-stats.10s.sh ~/path/to/your/swiftbar-plugins/
-chmod +x ~/path/to/your/swiftbar-plugins/wg-stats.10s.sh
+cp client/wg-stats.10s.sh ~/path/to/swiftbar-plugins/
+chmod +x ~/path/to/swiftbar-plugins/wg-stats.10s.sh
 ```
 
-## Usage
-
-Once installed, it works automatically:
-- Connect to iPhone hotspot → tunnel comes up in ~5–10 seconds
-- Disconnect → session stats are saved, tunnel goes down
-- Click the menu bar widget to see live usage, per-session stats, and totals
+---
 
 ## Terminal stats
 
@@ -162,28 +179,20 @@ Once installed, it works automatically:
 wg-stats
 ```
 
-## File locations
+---
+
+## File reference
 
 | File | Purpose |
 |------|---------|
 | `/opt/homebrew/etc/wireguard/wg0.conf` | WireGuard client config |
-| `/usr/local/bin/wireguard-hotspot.sh` | Auto-connect script |
-| `/usr/local/bin/wg-stats` | Stats script |
+| `/usr/local/bin/wireguard-hotspot.sh` | Auto-connect/disconnect script |
+| `/usr/local/bin/wg-stats` | Usage stats script |
 | `/Library/LaunchDaemons/com.wireguard.hotspot.plist` | launchd daemon |
 | `/var/log/wg-usage.log` | Session usage log |
 | `/var/log/wireguard-hotspot.log` | Daemon activity log |
 
-## How the auto-connect works
-
-```
-Network change detected
-        ↓
-launchd fires wireguard-hotspot.sh
-        ↓
-Is gateway 172.20.10.1? (iPhone hotspot)
-   YES → wg-quick up wg0
-   NO  → save session stats → wg-quick down wg0
-```
+---
 
 ## License
 
