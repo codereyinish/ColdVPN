@@ -1,0 +1,10 @@
+# Never commit real WireGuard configs (contain private keys)
+wg0.conf
+*.key
+*.conf
+
+# Logs
+*.log
+
+# macOS
+.DS_Store

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+      <key>Label</key>
+      <string>com.wireguard.hotspot</string>
+      <key>ProgramArguments</key>
+      <array>
+          <string>/usr/local/bin/wireguard-hotspot.sh</string>
+      </array>
+      <key>WatchPaths</key>
+      <array>
+      <string>/Library/Preferences/SystemConfiguration</string>
+      </array>
+      <key>RunAtLoad</key>
+      <true/>
+      <key>StandardErrorPath</key>
+      <string>/var/log/wireguard-hotspot.log</string>
+      <key>StandardOutPath</key>
+      <string>/var/log/wireguard-hotspot.log</string>
+      <key>AbandonProcessGroup</key>
+      <true/>
+  </dict>
+  </plist>
