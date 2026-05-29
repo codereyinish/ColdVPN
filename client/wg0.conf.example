@@ -1,15 +1,17 @@
 [Interface]
 PrivateKey = YOUR_CLIENT_PRIVATE_KEY_HERE
-Address = 10.0.0.2/24
+Address = 10.0.0.2/32
 DNS = 1.1.1.1
 
-# Bypass AT&T hotspot detection — sets TTL/hop limit to 65
+# Bypass AT&T hotspot detection — sets TTL to 65
 # iPhone decrements it to 64, AT&T sees it as phone traffic (not hotspot)
-PostUp = /usr/sbin/sysctl -w net.inet.ip.ttl=65; /usr/sbin/sysctl -w net.inet6.ip6.hlim=65
-PostDown = /usr/sbin/sysctl -w net.inet.ip.ttl=64; /usr/sbin/sysctl -w net.inet6.ip6.hlim=64
+# IPv6 disabled on Wi-Fi when tunnel is up — forces all traffic to IPv4
+# through the encrypted tunnel, preventing raw IPv6 leaking through en0
+PostUp = /usr/sbin/sysctl -w net.inet.ip.ttl=65; /usr/sbin/networksetup -setv6off Wi-Fi
+PostDown = /usr/sbin/sysctl -w net.inet.ip.ttl=64; /usr/sbin/networksetup -setv6automatic Wi-Fi
 
 [Peer]
 PublicKey = YOUR_SERVER_PUBLIC_KEY_HERE
 Endpoint = YOUR_SERVER_IP:51820
-AllowedIPs = 0.0.0.0/0, ::/0
+AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
