@@ -35,25 +35,29 @@ The two halves of the solution:
 ```mermaid
 flowchart LR
     subgraph MAC["Mac"]
-        Safari["Safari (proxy-aware)"]
-        CLI["git / CLI / daemons (NOT proxy-aware)"]
-        utun["utun123 — L3 capture"]
-        t2s["tun2socks — L3 to L5"]
-        proxy["proxy.py — SOCKS5 :1080 + slot pool :9999"]
+        Safari["Safari - proxy-aware"]
+        CLI["git / CLI / daemons - not proxy-aware"]
+        utun["utun123 - L3 capture"]
+        t2s["tun2socks - L3 to L5"]
+        proxy["proxy.py - SOCKS5 1080 + slot pool 9999"]
     end
     subgraph PHONE["iPhone"]
-        app["app — 20 reverse slots"]
+        app["iPhone app - 20 reverse slots"]
     end
-    NET[("news.com / github.com")]
+    NET["news.com / github.com"]
 
-    Safari -- "SOCKS5 via loopback" --> proxy
-    CLI -- "raw IP packets" --> utun --> t2s -- "SOCKS5" --> proxy
-    proxy -- "CONNECT host:port via a slot (en0 to iPhone)" --> app
-    app -- "re-originate over CELLULAR" --> NET
-    NET -- "response" --> app
-    app -- "bytes back via the same slot" --> proxy
-    proxy -- "direct" --> Safari
-    proxy -- "re-packetize" --> t2s --> utun --> CLI
+    Safari -->|SOCKS5 via loopback| proxy
+    CLI -->|raw IP packets| utun
+    utun --> t2s
+    t2s -->|SOCKS5| proxy
+    proxy -->|CONNECT host port via a slot| app
+    app -->|re-originate over cellular| NET
+    NET -->|response| app
+    app -->|bytes back via same slot| proxy
+    proxy -->|direct| Safari
+    proxy -->|re-packetize| t2s
+    t2s --> utun
+    utun --> CLI
 ```
 
 ASCII version (for terminals / slides):
