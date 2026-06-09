@@ -4,23 +4,48 @@ import struct
 import time
 import os
 import sys
-import fcntl
 import subprocess
+import ipaddress
 
 TUNNEL_PORT = 9999   # iPhone connects here
 SOCKS_PORT  = 1080   # SOCKS5 (for GUI apps via system proxy setting)
-TRANS_PORT  = 8080   # Transparent proxy (for PF-redirected traffic, all apps)
 
 IFACE  = "en0"             # hotspot interface
 IPHONE = "172.20.10.1"     # iPhone (tunnel = phone APN)
 
-# PF DIOCNATLOOK ioctl — queries PF's NAT table for original destination
-DIOCNATLOOK = 0xc04c4417
-PF_OUT      = 2
+# ── Slot priority: keep foreground/user traffic from being starved by chatty
+# background services (iCloud sync, cert checks, push). Low-priority connections
+# are capped so RESERVED_HIGH slots always stay free for user traffic.
+POOL_SIZE     = 30         # MUST match the iPhone app's slot count — rebuild app to 30!
+RESERVED_HIGH = 15         # slots kept for high-priority (user) traffic
+LOW_PRIORITY_SUFFIXES = (  # hostname-based; IP-only CONNECTs default to high
+    "icloud.com", "push.apple.com", "ocsp.apple.com", "ocsp2.apple.com",
+    "aaplimg.com", "mzstatic.com", "spotify.com",
+)
+
 
 # Pool of available iPhone tunnel slots
 available_slots = []
 slots_lock = threading.Lock()
+
+# Low-priority (background) connections are capped to (POOL_SIZE - RESERVED_HIGH)
+# concurrent, leaving RESERVED_HIGH slots always free for user/foreground traffic.
+low_prio_sem = threading.Semaphore(max(1, POOL_SIZE - RESERVED_HIGH))
+
+def is_low_priority(host):
+    h = host.lower()
+    return any(h == s or h.endswith("." + s) for s in LOW_PRIORITY_SUFFIXES)
+
+def is_private(host):
+    """True if host is a private/local IP that can't be reached over cellular —
+    tunneling it would just hang at 0 bytes and clog a slot. Hostnames return
+    False (they resolve to public IPs via real DNS)."""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False   # a hostname, not an IP → public destination, tunnel it
+    return (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
 
 # Byte counters — how much we carried through the phone (phone APN)
 bytes_through_proxy = 0
@@ -206,7 +231,7 @@ def accept_iphone_slots():
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(("0.0.0.0", TUNNEL_PORT))
-    srv.listen(20)
+    srv.listen(POOL_SIZE)
     log(f"Waiting for iPhone slots on :{TUNNEL_PORT}")
     while True:
         conn, addr = srv.accept()
@@ -215,7 +240,7 @@ def accept_iphone_slots():
             # already closed (we only learn by peeking). Evict the dead ones so
             # healthy reconnects aren't rejected behind dead slots. An idle LIVE
             # slot has no data waiting (peek would-block); a DEAD one returns EOF.
-            if len(available_slots) >= 20:
+            if len(available_slots) >= POOL_SIZE:
                 alive = []
                 for s in available_slots:
                     try:
@@ -229,7 +254,7 @@ def accept_iphone_slots():
                         try: s.close()
                         except: pass              # errored → dead, evict
                 available_slots[:] = alive
-            if len(available_slots) >= 20:
+            if len(available_slots) >= POOL_SIZE:
                 log(f"Pool full, rejecting slot from {addr}")   # genuinely full of LIVE slots
                 conn.close()
                 continue
@@ -290,89 +315,6 @@ def pipe(a, b):
     t1.join()
     t2.join()
 
-# ── DIOCNATLOOK — get original destination from PF ───────────────────────────
-
-def get_original_dst(client_sock):
-    """
-    Ask PF's NAT table: "what was the original destination of this connection?"
-    PF stored it when it redirected the packet.
-    """
-    try:
-        peer_ip, peer_port   = client_sock.getpeername()
-        local_ip, local_port = client_sock.getsockname()
-
-        # struct pfioc_natlook (76 bytes):
-        # [0:16]  saddr  — client source IP (16 bytes, only first 4 used for IPv4)
-        # [16:32] daddr  — our proxy IP (redirected destination)
-        # [32:48] rsaddr — filled by kernel
-        # [48:64] rdaddr — ORIGINAL destination IP ← what we want
-        # [64:66] sport  — client source port
-        # [66:68] dport  — our proxy port
-        # [68:70] rsport — filled by kernel
-        # [70:72] rdport — ORIGINAL destination port ← what we want
-        # [72]    af     — address family (AF_INET = 2)
-        # [73]    proto  — IPPROTO_TCP = 6
-        # [74]    direction — PF_OUT = 2
-        # [75]    padding
-
-        buf = bytearray(76)
-        buf[0:4]   = socket.inet_aton(peer_ip)    # saddr
-        buf[16:20] = socket.inet_aton(local_ip)   # daddr
-        struct.pack_into('!H', buf, 64, peer_port)
-        struct.pack_into('!H', buf, 66, local_port)
-        buf[72] = socket.AF_INET
-        buf[73] = socket.IPPROTO_TCP
-        buf[74] = PF_OUT
-
-        pf_fd = os.open('/dev/pf', os.O_RDONLY)
-        try:
-            result = bytearray(fcntl.ioctl(pf_fd, DIOCNATLOOK, bytes(buf)))
-            orig_ip   = socket.inet_ntoa(bytes(result[48:52]))
-            orig_port = struct.unpack_from('!H', result, 70)[0]
-            return orig_ip, orig_port
-        finally:
-            os.close(pf_fd)
-
-    except Exception as e:
-        return None, None
-
-# ── Transparent proxy (PF-redirected traffic) ─────────────────────────────────
-
-def handle_transparent(client):
-    try:
-        host, port = get_original_dst(client)
-        if not host:
-            log("DIOCNATLOOK failed — could not get original destination")
-            client.close()
-            return
-
-        log(f"[PF] CONNECT {host}:{port}")
-        slot = send_connect(host, port)
-
-        if not wait_connected(slot):
-            log(f"iPhone failed to connect to {host}:{port}")
-            client.close()
-            slot.close()
-            return
-
-        log(f"[PF] Piping {host}:{port} via phone APN")
-        pipe(client, slot)
-
-    except Exception as e:
-        log(f"Transparent error: {e}")
-        try: client.close()
-        except: pass
-
-def accept_transparent():
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("127.0.0.1", TRANS_PORT))
-    srv.listen(100)
-    log(f"Transparent proxy on 127.0.0.1:{TRANS_PORT} (PF redirect target)")
-    while True:
-        client, _ = srv.accept()
-        threading.Thread(target=handle_transparent, args=(client,), daemon=True).start()
-
 # ── SOCKS5 proxy (GUI apps via system proxy setting) ─────────────────────────
 
 def handle_socks(client):
@@ -399,20 +341,43 @@ def handle_socks(client):
             return
 
         port = struct.unpack("!H", client.recv(2))[0]
-        log(f"[SOCKS5] CONNECT {host}:{port}")
 
-        slot = send_connect(host, port)
-
-        if not wait_connected(slot):
-            log(f"iPhone failed to connect to {host}:{port}")
-            client.send(b"\x05\x05\x00\x01\x00\x00\x00\x00\x00\x00")
+        # Private/local IPs (192.168.x, 10.x, 172.20.10.1, link-local...) can't be
+        # reached over cellular — tunneling them just hangs at 0 bytes and clogs a
+        # slot. Refuse fast, no slot used. (This lives in proxy.py, so it ONLY
+        # applies while the proxy runs — off the hotspot your LAN works normally.)
+        if is_private(host):
+            log(f"[SOCKS5] reject LOCAL {host}:{port} (private, not tunneled)")
+            client.send(b"\x05\x05\x00\x01\x00\x00\x00\x00\x00\x00")   # 0x05 = refused
             client.close()
-            slot.close()
             return
 
-        log(f"[SOCKS5] Piping {host}:{port} via phone APN")
-        client.send(b"\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00")
-        pipe(client, slot)
+        low = is_low_priority(host)
+        tag = "bg" if low else "user"
+        log(f"[SOCKS5] CONNECT {host}:{port} [{tag}]")
+
+        # PRIORITY: background traffic must not starve foreground. Low-priority
+        # connections wait on a semaphore capped at (POOL_SIZE - RESERVED_HIGH),
+        # so RESERVED_HIGH slots always stay free for user traffic. High-priority
+        # is uncapped (skips the gate).
+        if low:
+            low_prio_sem.acquire()
+        try:
+            slot = send_connect(host, port)
+
+            if not wait_connected(slot):
+                log(f"iPhone failed to connect to {host}:{port}")
+                client.send(b"\x05\x05\x00\x01\x00\x00\x00\x00\x00\x00")
+                client.close()
+                slot.close()
+                return
+
+            log(f"[SOCKS5] Piping {host}:{port} via phone APN [{tag}]")
+            client.send(b"\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00")
+            pipe(client, slot)
+        finally:
+            if low:
+                low_prio_sem.release()
 
     except Exception as e:
         log(f"SOCKS5 error: {e}")
@@ -464,4 +429,9 @@ if __name__ == "__main__":
     threading.Thread(target=leak_resolver, daemon=True).start()  # reverse-DNS fallback
     threading.Thread(target=leak_printer, daemon=True).start()
     log("📊 = bytes through phone APN | 🚨 = what's leaking to hotspot (by resource)")
-    accept_transparent()
+    # keep the main thread alive (daemon threads do the work)
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        pass
