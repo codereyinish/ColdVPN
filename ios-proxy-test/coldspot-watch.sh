@@ -14,7 +14,9 @@ LOCKFILE="/tmp/coldspot.lock"
 touch "$LOCKFILE"
 trap "rm -f $LOCKFILE" EXIT
 
-PROXY="/Users/inishbista/wg-hotspot-mac/ios-proxy-test/proxy.py"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+PROXY="$DIR/proxy.py"
+TUNCTL="$DIR/coldspot-tun-ctl.sh"
 LOG="/tmp/coldspot-proxy.log"
 IPHONE_GATEWAY="172.20.10.1"
 WIFI="Wi-Fi"
@@ -44,8 +46,17 @@ if [ "$current_gateway" = "$IPHONE_GATEWAY" ]; then
         networksetup -setsocksfirewallproxy "$WIFI" 127.0.0.1 1080 2>/dev/null
         networksetup -setsocksfirewallproxystate "$WIFI" on 2>/dev/null
     fi
+    # SAFETY NET: bring up the utun for anything that ignores SOCKS5. This is
+    # idempotent and self-gating — it only acts once proxy is up AND the iPhone
+    # has >=1 slot, otherwise it skips and the next reconcile (StartInterval)
+    # retries. So it can never blackout the Mac while slots aren't ready.
+    echo "  reconciling utun safety-net"
+    bash "$TUNCTL" up
 else
     echo "→ off hotspot"
+    # tear the utun DOWN FIRST — removes the 0/1 default override so other
+    # networks (home Wi-Fi, etc.) work the moment the hotspot is gone.
+    bash "$TUNCTL" down
     if pgrep -f "proxy.py" >/dev/null; then
         echo "  stopping proxy.py + leak monitor"
         pkill -f "proxy.py"
