@@ -18,10 +18,11 @@ IPHONE = "172.20.10.1"     # iPhone (tunnel = phone APN)
 # are capped so RESERVED_HIGH slots always stay free for user traffic.
 POOL_SIZE     = 30         # MUST match the iPhone app's slot count — rebuild app to 30!
 RESERVED_HIGH = 15         # slots kept for high-priority (user) traffic
-LOW_PRIORITY_SUFFIXES = (  # hostname-based; IP-only CONNECTs default to high
-    "icloud.com", "push.apple.com", "ocsp.apple.com", "ocsp2.apple.com",
+LOW_PRIORITY_SUFFIXES = (  # background/telemetry/sync domains -> [bg]
+    "apple.com", "icloud.com", "safebrowsing.apple",
     "aaplimg.com", "mzstatic.com", "spotify.com",
 )
+LOW_PRIORITY_NETS = (ipaddress.ip_network("17.0.0.0/8"),)   # Apple owns all of 17.x
 
 
 # Pool of available iPhone tunnel slots
@@ -34,7 +35,13 @@ low_prio_sem = threading.Semaphore(max(1, POOL_SIZE - RESERVED_HIGH))
 
 def is_low_priority(host):
     h = host.lower()
-    return any(h == s or h.endswith("." + s) for s in LOW_PRIORITY_SUFFIXES)
+    if any(h == s or h.endswith("." + s) for s in LOW_PRIORITY_SUFFIXES):
+        return True
+    try:                              # also demote known background IP ranges (Apple 17.x)
+        ip = ipaddress.ip_address(host)
+        return any(ip in net for net in LOW_PRIORITY_NETS)
+    except ValueError:
+        return False
 
 def is_private(host):
     """True if host is a private/local IP that can't be reached over cellular —

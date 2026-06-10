@@ -278,5 +278,39 @@ ios-proxy-test/
 ├── coldspot-tun-up/down.sh  thin wrappers around the engine
 ├── coldspot-watch.sh        launchd-driven start/stop on hotspot
 ├── com.coldspot.hotspot.plist  launchd job (WatchPaths + StartInterval=30s)
-└── ProxyTest/               iPhone app (the 20-slot reverse tunnel)
+└── ProxyTest/               iPhone app (the 30-slot reverse tunnel)
 ```
+
+---
+
+## 11. Future work / improvements
+
+### Idle-slot reaper (watermark-gated)
+Persistent idle connections — WebSockets (e.g. `alive.github.com`), keepalives,
+DoH (`one.one.one.one`) — hold a slot even when you're not actively using that
+site. Reclaim them, but **only under pressure** to avoid needless kill/reconnect
+churn:
+- Track per-connection `last_activity` + `bytes` (updated in `pipe()`).
+- A reaper thread: if free slots `< REAP_WATERMARK` (e.g. 5), close connections
+  idle `> REAP_IDLE_SECS` (e.g. 20s), preferring `[bg]` then most-idle.
+- **Safe by design:** idle != active (a connection serving a foreground task is
+  transferring bytes, so it's never idle), and persistent connections
+  auto-reconnect. Worst case is a sub-second reconnect on a backgrounded tab.
+- When free slots are plentiful the reaper does nothing → no churn. This is why
+  it's gated by a watermark rather than reaping on a fixed timeout.
+
+### UDP / QUIC support
+proxy.py + the iPhone slots are **TCP-only** (SOCKS5 CONNECT). UDP (QUIC/HTTP3)
+is dropped, so apps fall back to TCP. Real UDP support needs SOCKS5
+UDP-ASSOCIATE on both ends, or a TUN-level UDP path.
+
+### Optional encrypted relay (destination privacy)
+Today the iPhone re-originates directly to each destination, so the carrier sees
+destination IPs/SNI (metadata, not content — that's still HTTPS). An optional
+encrypted relay on the iPhone (TLS to a self-hosted server) would collapse all
+traffic into one opaque flow, hiding destinations, while still exiting on the
+phone bearer. Cost: extra latency + a single point of failure.
+
+### Adaptive pool sizing
+The pool is fixed at 30. It could shrink when idle (less iPhone battery/resource
+use) and grow under sustained load.
