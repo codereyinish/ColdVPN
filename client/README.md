@@ -4,6 +4,8 @@ Tunnel your Mac through your own cloud server over an encrypted WireGuard
 connection, so traffic is encrypted to a server *you* control — instead of
 trusting a third-party VPN provider. A menu-bar widget shows live data usage.
 
+📐 **Why WireGuard, and not a simpler TLS relay?** → [ARCHITECTURE.md](ARCHITECTURE.md)
+
 ## Why self-hosted
 Public / free WiFi is slow and untrusted: anything between you and a site can
 snoop or tamper. A VPN fixes that — but commercial VPNs ask you to trust *their*
