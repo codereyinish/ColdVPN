@@ -1,0 +1,69 @@
+#!/bin/bash
+# wg-monitor — your VPN client + your VPS server health, in one view.
+#
+# Client side: WireGuard transfer/status (needs the wg-quick CLI tunnel; the
+#   sandboxed App Store tunnel is NOT visible here — that's the whole point).
+# Server side: load / connections / latency pulled from the VPS over SSH.
+#
+# Config — set these via env or ~/.wg-monitor.conf:
+#   WG_IFACE     WireGuard interface           (default: wg0)
+#   SERVER_SSH   ssh target for the VPS        e.g. ubuntu@1.2.3.4  (needed for server stats)
+#
+# Usage:
+#   wg-monitor            one human-readable snapshot
+#   wg-monitor --json     one snapshot as JSON   (for the menu-bar app)
+#   wg-monitor --watch    refresh every 2s in the terminal
+
+[ -f "$HOME/.wg-monitor.conf" ] && . "$HOME/.wg-monitor.conf"
+WG_IFACE="${WG_IFACE:-wg0}"
+SERVER_SSH="${SERVER_SSH:-}"
+
+human() {  # bytes -> human
+    awk -v b="${1:-0}" 'BEGIN{ split("B KB MB GB TB",u," "); i=1; while(b>=1024 && i<5){b/=1024;i++}; printf "%.1f %s", b, u[i] }'
+}
+
+collect() {
+    # ---- client (local) ----
+    if sudo wg show "$WG_IFACE" >/dev/null 2>&1; then
+        UP=1
+        read -r RX TX <<<"$(sudo wg show "$WG_IFACE" transfer | awk 'NR==1{print $2" "$3}')"
+        RX=${RX:-0}; TX=${TX:-0}
+    else
+        UP=0; RX=0; TX=0
+    fi
+    # ---- server (over SSH) ----
+    LOAD="-"; CONNS="-"; LAT="-"
+    if [ -n "$SERVER_SSH" ]; then
+        out=$(ssh -o ConnectTimeout=3 -o BatchMode=yes "$SERVER_SSH" \
+              "uptime | sed -E 's/.*load average:[[:space:]]*//'; ss -tan 2>/dev/null | grep -c ESTAB" 2>/dev/null)
+        if [ -n "$out" ]; then
+            LOAD=$(printf '%s\n' "$out" | sed -n 1p)
+            CONNS=$(printf '%s\n' "$out" | sed -n 2p)
+        fi
+        host="${SERVER_SSH#*@}"
+        LAT=$(ping -c1 -t2 "$host" 2>/dev/null | awk -F'/' 'END{ if($5!="") printf "%.0f ms", $5 }')
+        [ -z "$LAT" ] && LAT="-"
+    fi
+}
+
+print_human() {
+    collect
+    if [ "$UP" = 1 ]; then echo "● Connected to VPN"; echo "  down $(human "$RX")   up $(human "$TX")"
+    else echo "○ Disconnected"; fi
+    echo "  ── server ──"
+    echo "  load     $LOAD"
+    echo "  conns    $CONNS"
+    echo "  latency  $LAT"
+}
+
+print_json() {
+    collect
+    printf '{"up":%s,"rx":%s,"tx":%s,"load":"%s","conns":"%s","latency":"%s"}\n' \
+        "$UP" "$RX" "$TX" "$LOAD" "$CONNS" "$LAT"
+}
+
+case "${1:-}" in
+    --json)  print_json ;;
+    --watch) while true; do clear; print_human; sleep 2; done ;;
+    *)       print_human ;;
+esac
