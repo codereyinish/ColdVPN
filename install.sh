@@ -11,10 +11,10 @@
 #   - Homebrew (if missing)
 #   - wireguard-tools (via Homebrew)
 #   - SwiftBar (menu-bar app)
-#   - wireguardvpn-toggle.sh   → /usr/local/bin/   (on/off switch)
-#   - com.wireguardvpn.plist   → /Library/LaunchDaemons/  (brings tunnel up at boot)
+#   - coldvpn-toggle.sh   → /usr/local/bin/   (on/off switch)
+#   - com.coldvpn.plist   → /Library/LaunchDaemons/  (brings tunnel up at boot)
 #   - wg0.conf                 → your WireGuard config dir
-#   - sudoers rule             → /etc/sudoers.d/wireguardvpn  (toggle without password)
+#   - sudoers rule             → /etc/sudoers.d/coldvpn  (toggle without password)
 #   - coldvpn.5s.sh            → your SwiftBar plugins folder  (menu-bar button)
 #
 # You provide:
@@ -218,23 +218,23 @@ ok "wg0.conf created at $WG_CONF_DIR/wg0.conf"
 header "Step 9/13 — Installing the toggle script"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)/client"
-TOGGLE=/usr/local/bin/wireguardvpn-toggle.sh
+TOGGLE=/usr/local/bin/coldvpn-toggle.sh
 
 # Must be root-owned and not user-writable — that lock is what makes the
 # passwordless sudoers rule (Step 11) safe.
-sudo cp "$SCRIPT_DIR/wireguardvpn-toggle.sh" "$TOGGLE"
+sudo cp "$SCRIPT_DIR/coldvpn-toggle.sh" "$TOGGLE"
 sudo chown root:wheel "$TOGGLE"
 sudo chmod 755 "$TOGGLE"
 
-ok "wireguardvpn-toggle.sh → $TOGGLE"
+ok "coldvpn-toggle.sh → $TOGGLE"
 
 # =============================================================================
 # STEP 10 — Install the LaunchDaemon (brings the tunnel up at boot)
 # =============================================================================
 header "Step 10/13 — Installing the boot service"
 
-PLIST=/Library/LaunchDaemons/com.wireguardvpn.plist
-sudo cp "$SCRIPT_DIR/com.wireguardvpn.plist" "$PLIST"
+PLIST=/Library/LaunchDaemons/com.coldvpn.plist
+sudo cp "$SCRIPT_DIR/com.coldvpn.plist" "$PLIST"
 sudo chown root:wheel "$PLIST"
 sudo chmod 644 "$PLIST"
 
@@ -251,7 +251,7 @@ header "Step 11/13 — Configuring sudoers"
 
 # Lets the menu-bar button run the toggle script without a password prompt.
 # Scoped to ONLY that one script, for the current user.
-SUDOERS_FILE=/etc/sudoers.d/wireguardvpn
+SUDOERS_FILE=/etc/sudoers.d/coldvpn
 echo "$(whoami) ALL=(root) NOPASSWD: $TOGGLE" | sudo tee "$SUDOERS_FILE" > /dev/null
 sudo chown root:wheel "$SUDOERS_FILE"
 sudo chmod 440 "$SUDOERS_FILE"

@@ -1,13 +1,13 @@
 import Cocoa
 
-// wg-monitor.swift — a tiny menu-bar widget for the VPN.
-// Shows VPN status + client transfer + VPS load/conns/latency (via the `wg-monitor`
+// coldvpn-monitor.swift — a tiny menu-bar widget for the VPN.
+// Shows VPN status + client transfer + VPS load/conns/latency (via the `coldvpn-monitor`
 // CLI in this folder), and toggles the tunnel. Lives only in the menu bar.
 //
-// Build:  swiftc wg-monitor.swift -o WGMonitor
-// Run:    ./WGMonitor        (needs `wg-monitor` on PATH, e.g. /usr/local/bin)
+// Build:  swiftc coldvpn-monitor.swift -o WGMonitor
+// Run:    ./WGMonitor        (needs `coldvpn-monitor` on PATH, e.g. /usr/local/bin)
 
-let MONITOR  = "wg-monitor"   // the CLI; install to /usr/local/bin or adjust PATH
+let MONITOR  = "coldvpn-monitor"   // the CLI; install to /usr/local/bin or adjust PATH
 let WG_IFACE = "wg0"
 
 func sh(_ command: String) -> String {

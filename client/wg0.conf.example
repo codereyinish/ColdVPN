@@ -11,6 +11,6 @@ DNS = 1.1.1.1, 2606:4700:4700::1111
 [Peer]
 # The server you tunnel through.
 PublicKey = YOUR_SERVER_PUBLIC_KEY_HERE
-Endpoint = YOUR_SERVER_IP:51820        # must match the server's ListenPort
+Endpoint = YOUR_SERVER_IP:443        # must match the server's ListenPort
 AllowedIPs = 0.0.0.0/0, ::/0           # full dual-stack tunnel: ALL traffic (v4 + v6) goes through WireGuard
 PersistentKeepalive = 25               # tiny packet every 25s to hold the NAT/firewall hole open

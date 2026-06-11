@@ -1,5 +1,5 @@
 #!/bin/bash
-# wireguardvpn-toggle.sh — one switch for the always-on WireGuard VPN.
+# coldvpn-toggle.sh — one switch for the always-on WireGuard VPN.
 #   on     : enable + bootstrap the daemon (RunAtLoad brings the tunnel up), boot-persist
 #   off    : wg-quick down + bootout + disable (tunnel down now, won't return at boot)
 #   toggle : flip whichever state we're in
@@ -8,7 +8,7 @@
 # so no non-root user can edit it (that lock is what makes passwordless sudo safe).
 
 WG_IF="wg0"
-LABEL="com.wireguardvpn"
+LABEL="com.coldvpn"
 PLIST="/Library/LaunchDaemons/${LABEL}.plist"
 WG="/opt/homebrew/bin/wg"
 WG_QUICK="/opt/homebrew/bin/wg-quick"

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.wireguardvpn</string>
+    <string>com.coldvpn</string>
 
     <!-- No watch script, no network check: just bring the tunnel up directly. -->
     <key>ProgramArguments</key>
@@ -34,8 +34,8 @@
          (wg-quick exits after the tunnel is up; the interface persists). -->
 
     <key>StandardOutPath</key>
-    <string>/var/log/wireguardvpn.log</string>
+    <string>/var/log/coldvpn.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/wireguardvpn.log</string>
+    <string>/var/log/coldvpn.log</string>
 </dict>
 </plist>

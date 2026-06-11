@@ -21,7 +21,7 @@ By contributing, you agree your changes fall under the same
 
 ## Reporting a bug
 
-Open an [issue](https://github.com/codereyinish/wg-hotspot-mac/issues) and include:
+Open an [issue](https://github.com/codereyinish/ColdVPN/issues) and include:
 
 - What you did
 - What you expected
@@ -33,7 +33,7 @@ Open an [issue](https://github.com/codereyinish/wg-hotspot-mac/issues) and inclu
 sw_vers
 uname -m
 sudo wg show
-cat /var/log/wireguard-hotspot.log | tail -20
+/usr/local/bin/coldvpn-toggle.sh status
 ```
 
 ---
@@ -43,8 +43,8 @@ cat /var/log/wireguard-hotspot.log | tail -20
 ### 1. Fork and clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/wg-hotspot-mac
-cd wg-hotspot-mac
+git clone https://github.com/YOUR_USERNAME/ColdVPN
+cd ColdVPN
 ```
 
 ### 2. Create a branch
@@ -63,14 +63,11 @@ See [DEVELOPER.md](DEVELOPER.md) for how to run and test each one manually.
 ### 4. Test before submitting
 
 ```bash
-# Test wg-stats
-sudo cp client/wg-stats /usr/local/bin/wg-stats
-wg-stats
-wg-stats --bar
-
-# Test wireguard-hotspot.sh
-sudo cp client/wireguard-hotspot.sh /usr/local/bin/wireguard-hotspot.sh
-sudo /usr/local/bin/wireguard-hotspot.sh
+# Test the toggle
+sudo cp client/coldvpn-toggle.sh /usr/local/bin/coldvpn-toggle.sh
+sudo /usr/local/bin/coldvpn-toggle.sh on
+curl -s https://ifconfig.me        # should print your server's public IP
+sudo /usr/local/bin/coldvpn-toggle.sh off
 ```
 
 ### 5. Commit clearly

@@ -1,5 +1,5 @@
 # Passwordless root for ONLY the VPN toggle script — nothing else.
-# Install to /etc/sudoers.d/wireguardvpn  (root:wheel, mode 440), validated with visudo.
+# Install to /etc/sudoers.d/coldvpn  (root:wheel, mode 440), validated with visudo.
 # SAFE ONLY IF the script is root-owned and not user-writable (root:wheel 755),
 # otherwise this becomes a privilege-escalation hole.
-inishbista ALL=(root) NOPASSWD: /usr/local/bin/wireguardvpn-toggle.sh
+inishbista ALL=(root) NOPASSWD: /usr/local/bin/coldvpn-toggle.sh

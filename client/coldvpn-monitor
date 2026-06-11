@@ -1,20 +1,20 @@
 #!/bin/bash
-# wg-monitor — your VPN client + your VPS server health, in one view.
+# coldvpn-monitor — your VPN client + your VPS server health, in one view.
 #
 # Client side: WireGuard transfer/status (needs the wg-quick CLI tunnel; the
 #   sandboxed App Store tunnel is NOT visible here — that's the whole point).
 # Server side: load / connections / latency pulled from the VPS over SSH.
 #
-# Config — set these via env or ~/.wg-monitor.conf:
+# Config — set these via env or ~/.coldvpn-monitor.conf:
 #   WG_IFACE     WireGuard interface           (default: wg0)
 #   SERVER_SSH   ssh target for the VPS        e.g. ubuntu@1.2.3.4  (needed for server stats)
 #
 # Usage:
-#   wg-monitor            one human-readable snapshot
-#   wg-monitor --json     one snapshot as JSON   (for the menu-bar app)
-#   wg-monitor --watch    refresh every 2s in the terminal
+#   coldvpn-monitor            one human-readable snapshot
+#   coldvpn-monitor --json     one snapshot as JSON   (for the menu-bar app)
+#   coldvpn-monitor --watch    refresh every 2s in the terminal
 
-[ -f "$HOME/.wg-monitor.conf" ] && . "$HOME/.wg-monitor.conf"
+[ -f "$HOME/.coldvpn-monitor.conf" ] && . "$HOME/.coldvpn-monitor.conf"
 WG_IFACE="${WG_IFACE:-wg0}"
 SERVER_SSH="${SERVER_SSH:-}"
 

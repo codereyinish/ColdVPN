@@ -24,12 +24,12 @@
 # Requirements:
 #   - Ubuntu 20.04 or 22.04
 #   - Root or sudo access
-#   - Port 51820 UDP open in your cloud firewall (Oracle security list)
+#   - Port 443 UDP open in your cloud firewall (Oracle security list)
 #
 # Usage:
 #   bash setup.sh
 #   or:
-#   curl -fsSL https://raw.githubusercontent.com/codereyinish/wg-hotspot-mac/main/server/setup.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | bash
 #
 # Author: github.com/codereyinish
 # =============================================================================
@@ -93,7 +93,7 @@ ask() {
 # =============================================================================
 clear
 echo ""
-echo "${BLD}  WireGuard Hotspot Mac — Server Setup${RST}"
+echo "${BLD}  ColdVPN — Server Setup${RST}"
 echo "  ────────────────────────────────────────"
 echo "  Sets up your WireGuard VPN server."
 echo "  Run this on your Oracle Cloud VPS (or any Ubuntu server)."
@@ -187,9 +187,9 @@ ok "IPv4 and IPv6 forwarding enabled"
 # =============================================================================
 header "Step 6/10 — Server configuration"
 
-ask LISTEN_PORT   "WireGuard listen port"         "51820"
-ask SERVER_ADDR   "Server VPN address"            "10.0.0.1"
-ask CLIENT_ADDR   "Client VPN address (your Mac)" "10.0.0.2"
+ask LISTEN_PORT   "WireGuard listen port"         "443"
+ask SERVER_ADDR   "Server VPN address"            "10.8.0.1"
+ask CLIENT_ADDR   "Client VPN address (your Mac)" "10.8.0.2"
 
 echo ""
 echo "  ${BLD}Paste your Mac client public key below.${RST}"
@@ -263,7 +263,7 @@ fi
 # Oracle Cloud / AWS users: you MUST also open the port in your
 # cloud provider's security list/security group (web console)
 # Oracle: Networking → VCN → Security Lists → Add Ingress Rule
-#   Protocol: UDP, Port: 51820
+#   Protocol: UDP, Port: 443
 echo ""
 echo "  ${YLW}⚠️  Cloud firewall reminder:${RST}"
 echo "  If you're on Oracle Cloud, you must also open UDP $LISTEN_PORT"

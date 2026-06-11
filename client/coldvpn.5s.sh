@@ -1,7 +1,7 @@
 #!/bin/bash
 # SwiftBar menu-bar plugin — ColdVPN toggle button (refreshes every 5s).
-# Wraps /usr/local/bin/wireguardvpn-toggle.sh, called passwordless via the sudoers rule.
-TOGGLE="/usr/local/bin/wireguardvpn-toggle.sh"
+# Wraps /usr/local/bin/coldvpn-toggle.sh, called passwordless via the sudoers rule.
+TOGGLE="/usr/local/bin/coldvpn-toggle.sh"
 
 STATE="$(sudo -n "$TOGGLE" status 2>/dev/null)"
 

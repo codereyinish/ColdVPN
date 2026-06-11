@@ -13,15 +13,15 @@
 
 [Interface]
 PrivateKey = YOUR_SERVER_PRIVATE_KEY_HERE
-Address    = 10.0.0.1/24
-ListenPort = 51820
+Address    = 10.8.0.1/24
+ListenPort = 443
 
 # NAT rules — routes VPN client traffic to the internet
 # Replace eth0 with your actual network interface
-PostUp   = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostUp   = iptables -I FORWARD 1 -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
 # Add one [Peer] block per client (Mac)
 [Peer]
 PublicKey  = YOUR_CLIENT_PUBLIC_KEY_HERE
-AllowedIPs = 10.0.0.2/32
+AllowedIPs = 10.8.0.2/32

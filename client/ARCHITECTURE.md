@@ -1,7 +1,6 @@
 # ColdVPN — Architecture & Decisions
 
-🔗 [Main README](../README.md) · 🖥️ [Mac client](README.md) ·
-☁️ [Server setup](../server/README.md)
+🔗 [Main README](../README.md) · 🔧 [Developer guide](../DEVELOPER.md)
 
 A record of the key design decisions, one file each — short "why this, not that"
 notes, written as the reasoning, not just the result.
