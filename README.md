@@ -1,23 +1,29 @@
-# Personal Networking Toolkit
+# ColdVPN
 
-Two self-built tools for routing a laptop's traffic securely when you're away from
-a trusted network — built as a hands-on deep-dive into how networking actually
-works: routing, tunneling, sockets, and encryption.
+An **always-on, self-hosted WireGuard VPN** for your Mac. Route *all* your
+traffic through a cloud server **you own** — instead of trusting a third-party
+VPN provider. Built as a hands-on deep-dive into how networking actually works:
+routing, tunneling, sockets, and encryption.
 
-## Two parts
+```
+your Mac → [WireGuard encrypted tunnel] → your server → internet
+```
 
-### 1. Self-hosted WireGuard VPN → [`client/`](client/) + [`server/`](server/)
-Your devices tunnel through your *own* cloud server over an encrypted WireGuard
-connection, so traffic is encrypted to a server you control — instead of trusting
-a third-party VPN provider. Great for privacy on slow, untrusted public WiFi.
-→ [client/README.md](client/README.md)
+It comes up by itself at boot on **any** network, and a menu-bar button toggles
+it on/off. No carrier tricks, no bypass — just a clean VPN to a box you control.
 
-### 2. Transparent system-wide proxy → [`ios-proxy-test/`](ios-proxy-test/)
-Capture **all** of a Mac's traffic at the IP layer — even apps that ignore proxy
-settings — and route it through a reverse tunnel to a second device. A deep dive
-into Layer-3 capture, tun2socks, routing internals, and connection pooling.
-→ [ios-proxy-test/README.md](ios-proxy-test/README.md) ·
-[ARCHITECTURE.md](ios-proxy-test/ARCHITECTURE.md)
+## The two halves
+
+| Part | What it is | Docs |
+|------|-----------|------|
+| 🖥️ [`client/`](client/) | the **Mac side** — installer, the always-on toggle, the menu-bar button | → [client/README.md](client/README.md) |
+| ☁️ [`server/`](server/) | the **cloud side** — one-command WireGuard server setup | → [server/README.md](server/README.md) |
+| 📐 design | why WireGuard, why the Mac, DNS through the tunnel | → [client/ARCHITECTURE.md](client/ARCHITECTURE.md) |
+
+## Quick start
+1. **Server** — on an Ubuntu VPS (e.g. Oracle Cloud Free Tier): run the setup
+   script and open **UDP 443**. → [server/README.md](server/README.md)
+2. **Mac** — clone this repo and run `./install.sh`. → [client/README.md](client/README.md)
 
 ## License
 [Elastic License 2.0](LICENSE) — free for personal use, source visible,

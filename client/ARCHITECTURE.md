@@ -1,4 +1,7 @@
-# WireGuard VPN — Architecture & Decisions
+# ColdVPN — Architecture & Decisions
+
+🔗 [Main README](../README.md) · 🖥️ [Mac client](README.md) ·
+☁️ [Server setup](../server/README.md)
 
 A record of the key design decisions, one file each — short "why this, not that"
 notes, written as the reasoning, not just the result.
