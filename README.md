@@ -12,63 +12,108 @@ It comes up by itself at boot on **any** network, and a 🟢/🔴 menu-bar butto
 toggles it on/off. No carrier tricks, no bypass — just a clean VPN to a box you
 control.
 
-📐 Want the *why* (WireGuard vs alternatives, DNS through the tunnel)? →
-[client/ARCHITECTURE.md](client/ARCHITECTURE.md)
-🔧 Want every step by hand? → [DEVELOPER.md](DEVELOPER.md)
-
 ---
 
 ## Setup
 
-Two halves: a **server** (the exit node) and your **Mac** (the client). Do the
-server first — it gives you the public key and IP the Mac needs.
+You set up **two machines** — they swap public keys and you're done:
 
-### 1. Server — on an Ubuntu VPS (e.g. Oracle Cloud Free Tier)
+| | Machine | What it is |
+|---|---|---|
+| **1** | **Server** | a cloud VM — the exit node |
+| **2** | **Mac** | the client that connects to it |
 
-**1a. Create the VM** (one-time, in the cloud console — this part isn't scripted):
-- Create a VM instance — **Ubuntu 22.04**, an **Always Free** shape.
-- **Add your SSH public key** when prompted (so you can log in).
-- Note the **public IP** it's assigned.
-- **Open the port** in the cloud firewall: WireGuard uses **UDP 443**. On Oracle:
-  *Networking → VCN → Security Lists → Add Ingress Rule → Protocol UDP, Port 443*.
+Do the **server first**: it hands you the public key and IP that the Mac needs.
 
-**1b. Run the installer** — SSH in, then as root:
+---
+
+## 1 · Server
+
+### Create the VM
+A one-time, by-hand step in your cloud console (Oracle Cloud Free Tier works
+well). In short: an **Ubuntu 22.04** instance, your **SSH key** added, and
+**UDP 443 open** in the firewall.
+
+→ **New to this? Full walkthrough: [server/CREATE-VM.md](server/CREATE-VM.md).**
+
+> **Why by hand?** Creating an account, a VM, and opening a cloud firewall can
+> only be done by a human in the provider's console — there's no server to script
+> against yet. Everything *after* you can SSH in is automated, below.
+
+### Run the installer
+SSH into the server, then:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash
 ```
-This installs WireGuard, generates the server keys, enables forwarding, sets up
-NAT, and starts the tunnel as a boot service. At the end it prints the **server
-public key** and **public IP** — keep those for the Mac.
 
-> **Oracle note:** the server's firewall must put the WireGuard FORWARD-accept
-> rule *above* Oracle's default REJECT — `setup.sh` already does this. If clients
-> connect but get no internet, that's the rule to check.
+This installs WireGuard, generates the server keys, enables forwarding + NAT,
+and starts the tunnel as a boot service.
 
-### 2. Mac — the client
+**When it finishes you'll see:**
+
+```
+✓ Server setup complete!
+
+  Server public key:  <copy this>
+  Server IP:          <your server's IP>
+  Server port:        443
+
+  Now run install.sh on your Mac.
+```
+
+Keep the **public key** and **IP** — the Mac asks for them next.
+
+> **Connected but no internet?** Oracle's Ubuntu image ships a default firewall
+> `REJECT` rule. `setup.sh` already inserts WireGuard's accept rule *above* it,
+> so this should just work — but that's the rule to check if it doesn't.
+
+---
+
+## 2 · Mac
 
 ```bash
 git clone https://github.com/codereyinish/ColdVPN.git
 cd ColdVPN
 ./install.sh
 ```
-The installer generates your keys, writes `wg0.conf` (using the server key + IP
-from step 1), installs the boot service (`com.coldvpn.plist`), the on/off switch
-(`coldvpn-toggle.sh`), and the 🟢/🔴 **ColdVPN** menu-bar button (`coldvpn.5s.sh`).
 
-During install you'll paste your Mac's public key into the server's config (the
-installer shows you exactly what to add).
+The installer generates your Mac's keys, writes `wg0.conf` (using the server key
++ IP from step 1), and installs the boot service, the on/off switch, and the
+🟢/🔴 **ColdVPN** menu-bar button.
 
-### Prefer no scripts?
-Install **WireGuard** from the **Mac App Store**, *Add Tunnel → Import from file*
-→ pick your `wg0.conf`, and toggle from its menu-bar icon. Same tunnel, native UI.
-See [decision 03](client/decisions/03-cli-vs-app.md).
+**Partway through it pauses** and shows your Mac's public key — paste that into
+the server's config (it shows you exactly what to add), then continue.
+
+> **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
+> *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.
+> ([why](client/decisions/03-cli-vs-app.md))
 
 ---
 
+## How the two keys meet
+
+Each side needs the *other's* public key — which is why the two installers
+interleave rather than running strictly one-then-the-other:
+
+```
+Mac install.sh   ──(Mac public key)──▶   server config
+server setup.sh  ──(server public key)─▶  Mac config
+```
+
+The Mac generates its key and **pauses** → you add it on the server → the server
+hands back its key → you finish the Mac. That handshake is the whole setup.
+
+---
+
+## Learn more
+- **Why WireGuard? DNS through the tunnel?** → [client/ARCHITECTURE.md](client/ARCHITECTURE.md)
+- **Every step by hand** → [DEVELOPER.md](DEVELOPER.md)
+- **Design decisions** → [client/decisions/](client/decisions/)
+
 ## Layout
-- [`client/`](client/) — the Mac side: installer scripts, the toggle, the
-  menu-bar button, and [`ARCHITECTURE.md`](client/ARCHITECTURE.md) + `decisions/`
-- [`server/`](server/) — the cloud side: `setup.sh` + the config template
+- [`client/`](client/) — the Mac side: installer, toggle, menu-bar button
+- [`server/`](server/) — the cloud side: `setup.sh` + config template
 
 ## License
 [Elastic License 2.0](LICENSE) — free for personal use, source visible,
