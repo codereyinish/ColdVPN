@@ -23,7 +23,7 @@
   # ── Convert bytes to human readable ──
   human_readable() {
       local bytes=$1
-      if [ "$bytes" -ge 1073741824 ]; then
+      if [ "$bytes" -ge 536870912 ]; then
           printf "%.2f GB" $(echo "scale=2; $bytes/1073741824" | bc)
       elif [ "$bytes" -ge 1048576 ]; then
           printf "%.2f MB" $(echo "scale=2; $bytes/1048576" | bc)

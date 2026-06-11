@@ -1,15 +1,16 @@
 [Interface]
+# This Mac's secret identity + its address INSIDE the tunnel (the private VPN net).
+# The /32 (v4) and /64 (v6) say "just me" — this client is not a router for a subnet.
 PrivateKey = YOUR_CLIENT_PRIVATE_KEY_HERE
-Address = 10.0.0.2/32
-DNS = 1.1.1.1
+Address = 10.8.0.2/32, fd86:ea04:1115::2/64
 
-# Disable IPv6 on Wi-Fi while the tunnel is up, so nothing leaks outside the
-# encrypted tunnel — all traffic goes IPv4 through WireGuard. Standard VPN hygiene.
-PostUp = /usr/sbin/networksetup -setv6off Wi-Fi
-PostDown = /usr/sbin/networksetup -setv6automatic Wi-Fi
+# Resolve DNS through the tunnel (Cloudflare v4 + v6) so the local network can't
+# see or answer your lookups. Standard VPN hygiene.
+DNS = 1.1.1.1, 2606:4700:4700::1111
 
 [Peer]
+# The server you tunnel through.
 PublicKey = YOUR_SERVER_PUBLIC_KEY_HERE
-Endpoint = YOUR_SERVER_IP:51820
-AllowedIPs = 0.0.0.0/0
-PersistentKeepalive = 25
+Endpoint = YOUR_SERVER_IP:51820        # must match the server's ListenPort
+AllowedIPs = 0.0.0.0/0, ::/0           # full dual-stack tunnel: ALL traffic (v4 + v6) goes through WireGuard
+PersistentKeepalive = 25               # tiny packet every 25s to hold the NAT/firewall hole open

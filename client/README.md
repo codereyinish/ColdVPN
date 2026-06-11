@@ -46,5 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/codereyinish/wg-hotspot-mac/main/se
 - `server/` — VPS / WireGuard server setup
 
 ## Note
-`wg0.conf.example` disables IPv6 while connected to prevent leaks outside the
-tunnel — standard VPN hygiene.
+`wg0.conf.example` is a **full dual-stack tunnel** — both IPv4 (`0.0.0.0/0`) and
+IPv6 (`::/0`) are routed through WireGuard, so nothing leaks outside the tunnel.
+This is the clean "regular VPN" route: everything is tunneled, with no need to
+disable IPv6 on the system. Standard VPN hygiene.
