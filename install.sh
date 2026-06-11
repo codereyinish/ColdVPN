@@ -96,6 +96,33 @@ WG_QUICK_BIN="$BREW_PREFIX/bin/wg-quick"
 WG_CONF_DIR="$BREW_PREFIX/etc/wireguard"
 
 # =============================================================================
+# STEP 1.5 — Clear any previous install (always start clean)
+# =============================================================================
+# This installer always runs the full flow from the top — it regenerates keys
+# and re-asks for your server details every time. So first we wipe any prior
+# install, under BOTH the current name (com.coldvpn) and the OLD name
+# (com.wireguardvpn) used before the rename. Without this, a previous daemon
+# would linger and fight the freshly-installed one over the wg0 interface.
+header "Step 1.5/13 — Clearing any previous install"
+
+sudo "$WG_QUICK_BIN" down wg0 2>/dev/null || true   # drop any live tunnel first
+
+for LABEL in com.coldvpn com.wireguardvpn; do
+    PLIST="/Library/LaunchDaemons/${LABEL}.plist"
+    if [ -f "$PLIST" ]; then
+        info "Removing previous '$LABEL' daemon"
+        sudo launchctl bootout  system "$PLIST"      2>/dev/null || true
+        sudo launchctl disable "system/${LABEL}"     2>/dev/null || true
+        sudo rm -f "$PLIST"
+    fi
+done
+
+# Old-named toggle + sudoers (the new-named ones get overwritten in Steps 9/11).
+sudo rm -f /usr/local/bin/wireguardvpn-toggle.sh /etc/sudoers.d/wireguardvpn
+
+ok "Previous install cleared (if any)"
+
+# =============================================================================
 # STEP 2 — Homebrew
 # =============================================================================
 header "Step 2/13 — Homebrew"
@@ -238,10 +265,13 @@ sudo cp "$SCRIPT_DIR/com.coldvpn.plist" "$PLIST"
 sudo chown root:wheel "$PLIST"
 sudo chmod 644 "$PLIST"
 
-# Load it now so the tunnel comes up; it will also start on every boot.
-sudo launchctl bootstrap system "$PLIST" 2>/dev/null || true
+# Reload-safe: bootstrap is a NO-OP if the label is already loaded, so on a
+# re-run an updated plist would never take effect. Unload any existing instance
+# first, then load fresh — this also cleanly re-ups the tunnel on a re-run.
+sudo launchctl bootout    system "$PLIST" 2>/dev/null || true
+sudo launchctl bootstrap  system "$PLIST" 2>/dev/null || true
 
-ok "Boot service installed and loaded"
+ok "Boot service installed and (re)loaded"
 info "Tunnel will come up automatically at boot"
 
 # =============================================================================
