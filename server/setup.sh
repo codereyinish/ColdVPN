@@ -207,12 +207,16 @@ header "Step 7/10 — Creating server config"
 #   MASQUERADE — rewrites source IP of VPN packets to server's IP
 #   so the internet sees your server's IP, not the VPN client's internal IP
 #   FORWARD — allows packets to pass between wg0 and the internet interface
+#   NOTE: use -I FORWARD 1 (insert at top), NOT -A (append). Oracle's Ubuntu
+#   image ships a default "FORWARD ... REJECT" rule; appending puts our ACCEPT
+#   below it, so it never matches and clients get no internet. Inserting at
+#   position 1 puts ACCEPT before the REJECT.
 cat > /etc/wireguard/wg0.conf << EOF
 [Interface]
 PrivateKey = ${SERVER_PRIVATE_KEY}
 Address = ${SERVER_ADDR}/24
 ListenPort = ${LISTEN_PORT}
-PostUp   = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE
+PostUp   = iptables -I FORWARD 1 -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ${NET_IF} -j MASQUERADE
 
 # Mac client
