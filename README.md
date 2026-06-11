@@ -25,17 +25,20 @@ server first — it gives you the public key and IP the Mac needs.
 
 ### 1. Server — on an Ubuntu VPS (e.g. Oracle Cloud Free Tier)
 
-Run as root:
+**1a. Create the VM** (one-time, in the cloud console — this part isn't scripted):
+- Create a VM instance — **Ubuntu 22.04**, an **Always Free** shape.
+- **Add your SSH public key** when prompted (so you can log in).
+- Note the **public IP** it's assigned.
+- **Open the port** in the cloud firewall: WireGuard uses **UDP 443**. On Oracle:
+  *Networking → VCN → Security Lists → Add Ingress Rule → Protocol UDP, Port 443*.
+
+**1b. Run the installer** — SSH in, then as root:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash
 ```
 This installs WireGuard, generates the server keys, enables forwarding, sets up
 NAT, and starts the tunnel as a boot service. At the end it prints the **server
 public key** and **public IP** — keep those for the Mac.
-
-Then open the port in your **cloud firewall**: WireGuard listens on **UDP 443**.
-On Oracle: *Networking → VCN → Security Lists → Add Ingress Rule → Protocol UDP,
-Port 443*.
 
 > **Oracle note:** the server's firewall must put the WireGuard FORWARD-accept
 > rule *above* Oracle's default REJECT — `setup.sh` already does this. If clients

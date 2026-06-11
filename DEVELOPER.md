@@ -33,6 +33,11 @@ on/off manually. There is no network detection and no hotspot logic.
 
 ## Part 1 — Server setup (run on your Ubuntu VPS)
 
+> **Prerequisite (not scripted):** create the VM first in your cloud console —
+> an **Ubuntu 22.04** Always-Free instance, add your **SSH public key**, note the
+> **public IP**, and open **UDP 443** in the cloud firewall (Oracle: VCN →
+> Security Lists → Add Ingress Rule). Then SSH in and run the steps below.
+
 ### Step 1 — Install WireGuard
 ```bash
 apt update && apt install -y wireguard wireguard-tools iptables
