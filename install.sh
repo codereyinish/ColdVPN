@@ -1,27 +1,24 @@
 #!/bin/bash
 # =============================================================================
-# install.sh — WireGuard VPN Installer
+# install.sh — ColdVPN Installer (Mac)
 # =============================================================================
-# What this script does:
-#   Installs everything needed to auto-connect your Mac to a self-hosted
-#   WireGuard VPN on a chosen network.
+# Sets up an always-on, self-hosted WireGuard VPN on your Mac. All Mac traffic
+# is routed through your own WireGuard server (e.g. Oracle Cloud free tier).
+# The tunnel comes up at boot on any network, and a menu-bar button lets you
+# toggle it on/off.
 #
 # What it installs:
 #   - Homebrew (if missing)
 #   - wireguard-tools (via Homebrew)
-#   - SwiftBar (via Homebrew, for the menu bar widget)
-#   - wireguard-hotspot.sh  → /usr/local/bin/
-#   - wg-stats              → /usr/local/bin/
-#   - com.wireguard.hotspot.plist → /Library/LaunchDaemons/
-#   - wg-stats.10s.sh       → your SwiftBar plugins folder
-#   - wg0.conf              → /opt/homebrew/etc/wireguard/
-#   - sudoers rule          → /etc/sudoers.d/wireguard
-#   - usage log             → /var/log/wg-usage.log
+#   - SwiftBar (menu-bar app)
+#   - wireguardvpn-toggle.sh   → /usr/local/bin/   (on/off switch)
+#   - com.wireguardvpn.plist   → /Library/LaunchDaemons/  (brings tunnel up at boot)
+#   - wg0.conf                 → your WireGuard config dir
+#   - sudoers rule             → /etc/sudoers.d/wireguardvpn  (toggle without password)
+#   - coldvpn.5s.sh            → your SwiftBar plugins folder  (menu-bar button)
 #
-# What the user needs to provide:
-#   - Their server IP
-#   - Their server WireGuard public key
-#   - SwiftBar plugins folder path (optional, has default)
+# You provide:
+#   - Your server's IP and WireGuard public key
 #
 # Requirements:
 #   - macOS (Apple Silicon or Intel)
@@ -36,7 +33,7 @@
 set -e  # exit immediately if any command fails
 
 # =============================================================================
-# COLORS — for readable terminal output
+# COLORS
 # =============================================================================
 RED=$'\033[91m'
 GRN=$'\033[92m'
@@ -48,49 +45,20 @@ RST=$'\033[0m'
 # =============================================================================
 # HELPERS
 # =============================================================================
+header() { echo ""; echo "${BLD}${BLU}── $1 ${RST}"; }
+ok()     { echo "  ${GRN}✓${RST} $1"; }
+info()   { echo "  ${YLW}→${RST} $1"; }
+die()    { echo ""; echo "  ${RED}✗ Error: $1${RST}"; echo ""; exit 1; }
 
-# Print a section header
-header() {
-    echo ""
-    echo "${BLD}${BLU}── $1 ${RST}"
-}
-
-# Print success
-ok() {
-    echo "  ${GRN}✓${RST} $1"
-}
-
-# Print info
-info() {
-    echo "  ${YLW}→${RST} $1"
-}
-
-# Print error and exit
-die() {
-    echo ""
-    echo "  ${RED}✗ Error: $1${RST}"
-    echo ""
-    exit 1
-}
-
-# Ask a question, store answer in variable
-# Usage: ask VARNAME "Question" "default value"
+# Ask a question, store answer in a variable. Usage: ask VAR "Question" "default"
 ask() {
-    local var=$1
-    local question=$2
-    local default=$3
+    local var=$1 question=$2 default=$3
     echo ""
-    if [ -n "$default" ]; then
-        printf "  ${BLD}$question${RST} [${default}]: "
-    else
-        printf "  ${BLD}$question${RST}: "
-    fi
+    if [ -n "$default" ]; then printf "  ${BLD}$question${RST} [${default}]: "
+    else                       printf "  ${BLD}$question${RST}: "; fi
     read -r input
-    if [ -z "$input" ] && [ -n "$default" ]; then
-        eval "$var=\"$default\""
-    else
-        eval "$var=\"$input\""
-    fi
+    if [ -z "$input" ] && [ -n "$default" ]; then eval "$var=\"$default\""
+    else eval "$var=\"$input\""; fi
 }
 
 # =============================================================================
@@ -98,38 +66,29 @@ ask() {
 # =============================================================================
 clear
 echo ""
-echo "${BLD}  WireGuard VPN — Installer${RST}"
+echo "${BLD}  ColdVPN — Installer${RST}"
 echo "  ────────────────────────────────────────"
-echo "  Automatically connect your Mac to your"
-echo "  own private VPN on a chosen network."
+echo "  An always-on, self-hosted WireGuard VPN"
+echo "  for your Mac. Routes all traffic through"
+echo "  your own server, on any network."
 echo ""
-echo "  This installer will ask you 3 things:"
-echo "    1. Your WireGuard server IP"
-echo "    2. Your server public key"
-echo "    3. Your SwiftBar plugins folder"
-echo ""
-echo "  Everything else is automatic."
+echo "  You'll need your server's IP and public key."
 echo ""
 read -rp "  Press Enter to start..."
 
 # =============================================================================
 # STEP 1 — Check this is macOS
 # =============================================================================
-header "Step 1/14 — Checking system"
+header "Step 1/13 — Checking system"
 
-if [ "$(uname)" != "Darwin" ]; then
-    die "This installer only supports macOS."
-fi
+[ "$(uname)" != "Darwin" ] && die "This installer only supports macOS."
 ok "macOS detected"
 
-# Detect Apple Silicon vs Intel — sets the correct Homebrew path
-ARCH=$(uname -m)
-if [ "$ARCH" = "arm64" ]; then
-    BREW_PREFIX="/opt/homebrew"
-    ok "Apple Silicon (M1/M2/M3) detected"
+# Apple Silicon vs Intel — sets the Homebrew path everything else uses
+if [ "$(uname -m)" = "arm64" ]; then
+    BREW_PREFIX="/opt/homebrew"; ok "Apple Silicon detected"
 else
-    BREW_PREFIX="/usr/local"
-    ok "Intel Mac detected"
+    BREW_PREFIX="/usr/local";    ok "Intel Mac detected"
 fi
 
 WG_BIN="$BREW_PREFIX/bin/wg"
@@ -137,9 +96,9 @@ WG_QUICK_BIN="$BREW_PREFIX/bin/wg-quick"
 WG_CONF_DIR="$BREW_PREFIX/etc/wireguard"
 
 # =============================================================================
-# STEP 2 — Install Homebrew
+# STEP 2 — Homebrew
 # =============================================================================
-header "Step 2/14 — Homebrew"
+header "Step 2/13 — Homebrew"
 
 if command -v brew &>/dev/null; then
     ok "Homebrew already installed — skipping"
@@ -150,9 +109,9 @@ else
 fi
 
 # =============================================================================
-# STEP 3 — Install wireguard-tools
+# STEP 3 — WireGuard tools
 # =============================================================================
-header "Step 3/14 — WireGuard tools"
+header "Step 3/13 — WireGuard tools"
 
 if command -v wg &>/dev/null; then
     ok "wireguard-tools already installed — skipping"
@@ -163,9 +122,9 @@ else
 fi
 
 # =============================================================================
-# STEP 4 — Install SwiftBar
+# STEP 4 — SwiftBar (menu-bar app)
 # =============================================================================
-header "Step 4/14 — SwiftBar"
+header "Step 4/13 — SwiftBar"
 
 if [ -d "/Applications/SwiftBar.app" ]; then
     ok "SwiftBar already installed — skipping"
@@ -178,12 +137,11 @@ else
 fi
 
 # =============================================================================
-# STEP 5 — Generate client WireGuard key pair
+# STEP 5 — Generate your WireGuard keys
 # =============================================================================
-header "Step 5/14 — Generating your WireGuard keys"
+header "Step 5/13 — Generating your keys"
 
-# Keys are generated fresh — private key is never saved to disk permanently
-# It goes straight into wg0.conf which is only readable by root
+# Private key is generated here and only ever written into wg0.conf (root-only).
 PRIVATE_KEY=$(wg genkey)
 PUBLIC_KEY=$(echo "$PRIVATE_KEY" | wg pubkey)
 
@@ -195,21 +153,19 @@ echo "  ${BLU}${PUBLIC_KEY}${RST}"
 echo ""
 
 # =============================================================================
-# STEP 6 — PAUSE: Add client key to server
+# STEP 6 — Add your key to the server
 # =============================================================================
-header "Step 6/14 — Add your key to the server"
+header "Step 6/13 — Add your key to the server"
 
-echo "  You need to add the public key above to your server's wg0.conf."
+echo "  Add the public key above to your server's wg0.conf."
 echo ""
 echo "  SSH into your server and run:"
-echo ""
 echo "  ${YLW}sudo nano /etc/wireguard/wg0.conf${RST}"
 echo ""
 echo "  Add this at the bottom:"
-echo ""
 echo "  ${YLW}[Peer]"
 echo "  PublicKey = ${PUBLIC_KEY}"
-echo "  AllowedIPs = 10.0.0.2/32${RST}"
+echo "  AllowedIPs = 10.8.0.2/32${RST}"
 echo ""
 echo "  Then restart WireGuard on the server:"
 echo "  ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
@@ -217,17 +173,16 @@ echo ""
 read -rp "  Press Enter once you've done this..."
 
 # =============================================================================
-# STEP 7 — Collect server info from user
+# STEP 7 — Your server details
 # =============================================================================
-header "Step 7/14 — Your server details"
+header "Step 7/13 — Your server details"
 
-ask SERVER_IP    "Server IP address (e.g. 123.456.789.0)" ""
-ask SERVER_PORT  "Server WireGuard port" "51820"
-ask SERVER_PUBKEY "Server public key" ""
-ask CLIENT_ADDR  "Your VPN client address" "10.0.0.2"
-ask DNS_SERVER   "DNS server to use" "1.1.1.1"
+ask SERVER_IP     "Server IP address (e.g. 203.0.113.10)" ""
+ask SERVER_PORT   "Server WireGuard port"                 "443"
+ask SERVER_PUBKEY "Server public key"                     ""
+ask CLIENT_ADDR   "Your VPN address (inside the tunnel)"  "10.8.0.2"
+ask DNS_SERVER    "DNS server to use"                     "1.1.1.1"
 
-# Validate — none of these can be empty
 [ -z "$SERVER_IP" ]     && die "Server IP cannot be empty"
 [ -z "$SERVER_PUBKEY" ] && die "Server public key cannot be empty"
 
@@ -236,24 +191,21 @@ ok "Server details collected"
 # =============================================================================
 # STEP 8 — Create wg0.conf
 # =============================================================================
-header "Step 8/14 — Creating WireGuard config"
+header "Step 8/13 — Creating WireGuard config"
 
 sudo mkdir -p "$WG_CONF_DIR"
 
-# Write wg0.conf with the user's details
-# PostUp/PostDown: sets TTL and IPv6 hop limit for correct packet routing
+# AllowedIPs 0.0.0.0/0 = send all traffic through the tunnel.
 sudo tee "$WG_CONF_DIR/wg0.conf" > /dev/null << EOF
 [Interface]
 PrivateKey = ${PRIVATE_KEY}
-Address = ${CLIENT_ADDR}/24
+Address = ${CLIENT_ADDR}/32
 DNS = ${DNS_SERVER}
-PostUp = /usr/sbin/sysctl -w net.inet.ip.ttl=65; /usr/sbin/sysctl -w net.inet6.ip6.hlim=65
-PostDown = /usr/sbin/sysctl -w net.inet.ip.ttl=64; /usr/sbin/sysctl -w net.inet6.ip6.hlim=64
 
 [Peer]
 PublicKey = ${SERVER_PUBKEY}
 Endpoint = ${SERVER_IP}:${SERVER_PORT}
-AllowedIPs = 0.0.0.0/0, ::/0
+AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
 
@@ -261,102 +213,79 @@ sudo chmod 600 "$WG_CONF_DIR/wg0.conf"
 ok "wg0.conf created at $WG_CONF_DIR/wg0.conf"
 
 # =============================================================================
-# STEP 9 — Install scripts to /usr/local/bin
+# STEP 9 — Install the toggle script
 # =============================================================================
-header "Step 9/14 — Installing scripts"
+header "Step 9/13 — Installing the toggle script"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)/client"
+TOGGLE=/usr/local/bin/wireguardvpn-toggle.sh
 
-sudo cp "$SCRIPT_DIR/wireguard-hotspot.sh" /usr/local/bin/wireguard-hotspot.sh
-sudo cp "$SCRIPT_DIR/wg-stats"             /usr/local/bin/wg-stats
-sudo chmod +x /usr/local/bin/wireguard-hotspot.sh
-sudo chmod +x /usr/local/bin/wg-stats
+# Must be root-owned and not user-writable — that lock is what makes the
+# passwordless sudoers rule (Step 11) safe.
+sudo cp "$SCRIPT_DIR/wireguardvpn-toggle.sh" "$TOGGLE"
+sudo chown root:wheel "$TOGGLE"
+sudo chmod 755 "$TOGGLE"
 
-ok "wireguard-hotspot.sh → /usr/local/bin/"
-ok "wg-stats → /usr/local/bin/"
-
-# =============================================================================
-# STEP 10 — Install LaunchDaemon
-# =============================================================================
-header "Step 10/14 — Installing LaunchDaemon"
-
-# LaunchDaemon watches for network changes and fires wireguard-hotspot.sh
-# Runs as root (required for wg-quick) — lives in /Library/LaunchDaemons
-sudo cp "$SCRIPT_DIR/com.wireguard.hotspot.plist" \
-    /Library/LaunchDaemons/com.wireguard.hotspot.plist
-
-sudo launchctl load /Library/LaunchDaemons/com.wireguard.hotspot.plist 2>/dev/null || true
-
-ok "LaunchDaemon installed and loaded"
-info "Will auto-start on every reboot"
+ok "wireguardvpn-toggle.sh → $TOGGLE"
 
 # =============================================================================
-# STEP 11 — Create usage log file
+# STEP 10 — Install the LaunchDaemon (brings the tunnel up at boot)
 # =============================================================================
-header "Step 11/14 — Creating log file"
+header "Step 10/13 — Installing the boot service"
 
-# wg-usage.log stores completed session stats (rx/tx bytes per session)
-# wireguard-hotspot.log stores daemon activity (for debugging)
-sudo touch /var/log/wg-usage.log
-sudo touch /var/log/wireguard-hotspot.log
-sudo chmod 644 /var/log/wg-usage.log
-sudo chmod 644 /var/log/wireguard-hotspot.log
+PLIST=/Library/LaunchDaemons/com.wireguardvpn.plist
+sudo cp "$SCRIPT_DIR/com.wireguardvpn.plist" "$PLIST"
+sudo chown root:wheel "$PLIST"
+sudo chmod 644 "$PLIST"
 
-ok "/var/log/wg-usage.log created"
-ok "/var/log/wireguard-hotspot.log created"
+# Load it now so the tunnel comes up; it will also start on every boot.
+sudo launchctl bootstrap system "$PLIST" 2>/dev/null || true
+
+ok "Boot service installed and loaded"
+info "Tunnel will come up automatically at boot"
 
 # =============================================================================
-# STEP 12 — Configure sudoers
+# STEP 11 — Configure sudoers (toggle without a password)
 # =============================================================================
-header "Step 12/14 — Configuring sudoers"
+header "Step 11/13 — Configuring sudoers"
 
-# Allows wg and wg-quick to run without password prompt
-# Required for: wg show (live stats), wg-quick up/down (tunnel management)
-# Writes to /etc/sudoers.d/ — safer than editing /etc/sudoers directly
-SUDOERS_FILE="/etc/sudoers.d/wireguard"
-echo "%admin ALL=(ALL) NOPASSWD: $WG_BIN, $WG_QUICK_BIN" | \
-    sudo tee "$SUDOERS_FILE" > /dev/null
+# Lets the menu-bar button run the toggle script without a password prompt.
+# Scoped to ONLY that one script, for the current user.
+SUDOERS_FILE=/etc/sudoers.d/wireguardvpn
+echo "$(whoami) ALL=(root) NOPASSWD: $TOGGLE" | sudo tee "$SUDOERS_FILE" > /dev/null
+sudo chown root:wheel "$SUDOERS_FILE"
 sudo chmod 440 "$SUDOERS_FILE"
 
-ok "Sudoers rule added — no password needed for wg commands"
+ok "Sudoers rule added"
 
 # =============================================================================
-# STEP 13 — Set up SwiftBar plugin
+# STEP 12 — Menu-bar button
 # =============================================================================
-header "Step 13/14 — SwiftBar plugin"
+header "Step 12/13 — Menu-bar button"
 
-# Default plugins folder — user can override
 DEFAULT_PLUGINS="$HOME/swiftbar-plugins"
 ask PLUGINS_DIR "SwiftBar plugins folder path" "$DEFAULT_PLUGINS"
 
 mkdir -p "$PLUGINS_DIR"
-cp "$SCRIPT_DIR/wg-stats.10s.sh" "$PLUGINS_DIR/wg-stats.10s.sh"
-chmod +x "$PLUGINS_DIR/wg-stats.10s.sh"
+cp "$SCRIPT_DIR/coldvpn.5s.sh" "$PLUGINS_DIR/coldvpn.5s.sh"
+chmod +x "$PLUGINS_DIR/coldvpn.5s.sh"
 
-ok "Plugin installed → $PLUGINS_DIR/wg-stats.10s.sh"
-info "Refreshes every 10 seconds automatically"
+ok "Menu-bar button installed → $PLUGINS_DIR/coldvpn.5s.sh"
 
 # =============================================================================
-# STEP 14 — Done
+# STEP 13 — Done
 # =============================================================================
-header "Step 14/14 — All done"
+header "Step 13/13 — All done"
 
 echo ""
-echo "${GRN}${BLD}  ✓ Installation complete!${RST}"
+echo "${GRN}${BLD}  ✓ ColdVPN installed!${RST}"
 echo ""
-echo "  What was installed:"
-echo "  • WireGuard config    → $WG_CONF_DIR/wg0.conf"
-echo "  • Auto-connect script → /usr/local/bin/wireguard-hotspot.sh"
-echo "  • Stats script        → /usr/local/bin/wg-stats"
-echo "  • LaunchDaemon        → /Library/LaunchDaemons/com.wireguard.hotspot.plist"
-echo "  • Usage log           → /var/log/wg-usage.log"
-echo "  • SwiftBar plugin     → $PLUGINS_DIR/wg-stats.10s.sh"
+echo "  What you got:"
+echo "  • WireGuard config → $WG_CONF_DIR/wg0.conf"
+echo "  • Toggle script    → $TOGGLE"
+echo "  • Boot service     → $PLIST"
+echo "  • Menu-bar button  → $PLUGINS_DIR/coldvpn.5s.sh"
 echo ""
-echo "  To test:"
-echo "  ${YLW}  1. Connect your iPhone hotspot${RST}"
-echo "  ${YLW}  2. Wait 5–10 seconds${RST}"
-echo "  ${YLW}  3. Check the menu bar — should show WG ● live${RST}"
-echo ""
-echo "  To view stats in terminal:"
-echo "  ${YLW}  wg-stats${RST}"
+echo "  The 🟢/🔴 ColdVPN button in your menu bar turns the VPN on/off."
+echo "  The tunnel also comes up by itself at boot."
 echo ""
