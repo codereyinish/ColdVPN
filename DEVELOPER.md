@@ -17,7 +17,6 @@ ColdVPN/
 │   ├── wg0.conf.example                ← Mac WireGuard config template
 │   ├── coldvpn-toggle.sh          ← on/off/toggle/status switch
 │   ├── com.coldvpn.plist          ← launchd daemon (RunAtLoad → tunnel up at boot)
-│   ├── coldvpn.sudoers            ← scoped NOPASSWD rule for the toggle
 │   ├── coldvpn.5s.sh                   ← SwiftBar menu-bar on/off button
 │   ├── coldvpn-monitor                      ← dev widget: client + server health (optional)
 │   ├── coldvpn-monitor.swift                ← native menu-bar app for coldvpn-monitor (optional)
@@ -142,6 +141,10 @@ sudo launchctl bootstrap system /Library/LaunchDaemons/com.coldvpn.plist
 `RunAtLoad` brings the tunnel up now and on every boot, on any network.
 
 ### Step 7 — Configure sudoers (toggle without a password)
+The menu-bar button must run the toggle as root with no password prompt. This
+rule grants passwordless `sudo` for **only** that one script — safe *because* the
+script is root-owned and not user-writable (Step 5). `install.sh` writes this rule
+itself; there's no `.sudoers` file to copy.
 ```bash
 echo "$(whoami) ALL=(root) NOPASSWD: /usr/local/bin/coldvpn-toggle.sh" \
     | sudo tee /etc/sudoers.d/coldvpn
