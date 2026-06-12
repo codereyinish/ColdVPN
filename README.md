@@ -16,56 +16,14 @@ control.
 
 ## Setup
 
-You set up **two machines** — they swap public keys and you're done:
+Two things you do by hand — everything after is automatic.
 
-| | Machine | What it is |
-|---|---|---|
-| **1** | **Server** | a cloud VM — the exit node |
-| **2** | **Mac** | the client that connects to it |
+### 1 · Create the server VM
 
-Do the **server first** — then on the Mac you only need its **IP** (plus the SSH
-access you already have). `install.sh` fetches everything else over SSH.
+A free **Oracle Cloud** Ubuntu instance, with **UDP 443** open. One-time, in the
+cloud console. → [server/CREATE-VM.md](server/CREATE-VM.md)
 
----
-
-## 1 · Server
-
-### Create the VM
-
-A Linux box with a public IP to be your exit node — a free **Oracle Cloud**
-Ubuntu instance works well. You make it once, by hand, in the cloud console, and
-open **UDP 443** so WireGuard can be reached.
-
-→ **How: [server/CREATE-VM.md](server/CREATE-VM.md).**
-
-### Run the installer
-SSH into the server, then:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash
-```
-
-This installs WireGuard, generates the server keys, enables forwarding + NAT,
-and starts the tunnel as a boot service.
-
-**When it finishes you'll see:**
-
-```
-✓ Server setup complete!
-
-  Server public key:  <copy this>
-  Server IP:          <your server's IP>
-  Server port:        443
-
-  Now run install.sh on your Mac.
-```
-
-Keep the **IP** — that, plus your SSH access to the box, is all the Mac needs.
-It reads the server's public key itself over SSH (next).
-
----
-
-## 2 · Mac
+### 2 · Run the installer on your Mac
 
 ```bash
 git clone https://github.com/codereyinish/ColdVPN.git
@@ -73,14 +31,15 @@ cd ColdVPN
 ./install.sh
 ```
 
-All you give it is the **server's IP** (SSH user defaults to `ubuntu`). It then:
+It pauses once — give it your **server IP** and **SSH user**:
 
-1. installs `wireguard-tools` + SwiftBar and generates this Mac's keys
-2. SSHes into the server, reads its public key + port + tunnel subnet
-3. swaps keys (below) and writes `wg0.conf`
-4. installs the boot service, on/off switch, and 🟢/🔴 menu-bar button
+- **IP** — Oracle console → Instances → *Public IP address*
+- **SSH user** — `ubuntu` (default; just press Enter)
 
-When it finishes the tunnel is up — `curl ifconfig.me` shows your server's IP.
+That's the last manual step. `install.sh` SSHes in
+([why](client/decisions/06-automate-key-handoff-over-ssh.md)), sets the server up
+if it's fresh, swaps keys, and brings the tunnel up — `curl ifconfig.me` then
+shows your server's IP.
 
 > **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
 > *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.

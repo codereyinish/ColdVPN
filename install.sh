@@ -249,6 +249,17 @@ narrate "ssh ${SSH_DEST}  — connecting to your server..."
 if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
     ok "you're on the server"
 
+    # Fresh server? Bootstrap WireGuard over this same SSH connection — but ONLY
+    # if it isn't set up yet. An existing wg0 is left untouched (never re-keyed),
+    # so running this against a live server is safe.
+    if ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0' >/dev/null 2>&1; then
+        ok "server already has WireGuard (wg0) — leaving it as-is"
+    else
+        narrate "fresh server — installing WireGuard (one-time setup.sh over SSH)..."
+        ssh $SSH_OPTS "$SSH_DEST" 'curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash'
+        ok "server WireGuard installed"
+    fi
+
     narrate "reading the server's identity (its public key)..."
     SERVER_PUBKEY=$(ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0 public-key' 2>/dev/null | tr -d '[:space:]')
     [ -z "$SERVER_PUBKEY" ] && die "Couldn't read the server's public key (is WireGuard running there?)."
