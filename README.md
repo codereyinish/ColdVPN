@@ -59,33 +59,52 @@ button to toggle the tunnel off and back on.
 
 ## How it works
 
-The whole flow, from your one command to a live tunnel. Nodes link to the
-relevant doc.
+Left to right: your one command to a live tunnel. Each numbered stage opens up
+into what happens inside it.
 
 ```mermaid
-flowchart TD
-    A(["You run ./install.sh on the Mac"]) --> B["install.sh: install wireguard-tools + SwiftBar,<br/>generate this Mac's key pair"]
-    B --> C["CHECKPOINT — you enter the server's<br/>public IP + SSH username"]
-    C --> D["install.sh SSHes into the server"]
-    D --> E{"Server already set up?<br/>(does wg0 exist)"}
-    E -->|"no — fresh VM"| F["run setup.sh on the server, over SSH"]
-    F --> G["setup.sh: install WireGuard, reuse or generate<br/>the server key, write dual-stack wg0.conf + NAT,<br/>start wg-quick@wg0"]
-    E -->|"yes"| H["skip setup — leave as-is<br/>(server is never re-keyed)"]
-    G --> I["exchange keys over the same SSH —<br/>Mac public key to the server peer,<br/>server public key into the Mac's wg0.conf"]
-    H --> I
-    I --> J["install.sh writes wg0.conf and installs the<br/>boot daemon, toggle, and menu-bar button"]
-    J --> K(["tunnel up — verify with curl ifconfig.me and wg show"])
+flowchart LR
+    Start(["./install.sh<br/>on the Mac"]) --> S1
+    S1 --> CP["CHECKPOINT —<br/>you enter server<br/>IP + SSH user"]
+    CP --> SSH["SSH into<br/>the server"]
+    SSH --> Q{"wg0<br/>exists?"}
+    Q -->|"fresh"| S2
+    Q -->|"existing"| SKIP["skip setup —<br/>never re-keyed"]
+    S2 --> S3
+    SKIP --> S3
+    S3 --> S4
+    S4 --> Done(["tunnel up"])
 
-    click B "client/ARCHITECTURE.md" "How the Mac client is built"
-    click D "client/decisions/05-ssh-trust-model.md" "Why SSH, and its trust tradeoffs"
-    click F "server/CREATE-VM.md" "How the server VM is created by hand"
-    click G "server/setup.sh" "The server setup script"
-    click I "client/decisions/06-automate-key-handoff-over-ssh.md" "Why the key handoff is automated over SSH"
+    subgraph S1["① install.sh — set up the Mac"]
+        direction TB
+        a1["install wireguard-tools<br/>+ SwiftBar"] --> a2["generate this<br/>Mac's key pair"]
+    end
+
+    subgraph S2["② setup.sh — fresh server only"]
+        direction TB
+        b1["apt install wireguard"] --> b2["reuse or generate<br/>the server key"]
+        b2 --> b3["write dual-stack<br/>wg0.conf + NAT"]
+        b3 --> b4["start wg-quick@wg0"]
+    end
+
+    subgraph S3["③ exchange keys over SSH"]
+        direction TB
+        c1["Mac pubkey →<br/>server peer"] --> c2["server pubkey →<br/>Mac wg0.conf"]
+    end
+
+    subgraph S4["④ install.sh — finish on the Mac"]
+        direction TB
+        d1["write wg0.conf"] --> d2["boot daemon + toggle<br/>+ menu-bar button"]
+    end
 ```
 
-Links: [client build](client/ARCHITECTURE.md) · [create the VM](server/CREATE-VM.md) · [why automate SSH](client/decisions/06-automate-key-handoff-over-ssh.md) · [SSH trust + flaws](client/decisions/05-ssh-trust-model.md)
+**Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
 
-At the end, `wg show` confirms the link is live:
+> Why the links are listed here instead of on the boxes: GitHub sandboxes Mermaid,
+> so node clicks don't fire. The numbers ①–④ above match the diagram — that's the
+> workaround.
+
+After it's up, `wg show` confirms the handshake:
 
 ```text
 interface: wg0
