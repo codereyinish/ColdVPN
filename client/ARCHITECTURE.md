@@ -20,3 +20,50 @@ your Mac → [WireGuard encrypted tunnel] → your VPS → internet
 - **asymmetric keys** — the private key never leaves the device
 - **runs on the Mac** — free utun, protects the Mac's own traffic
 - **two ways to run it** — the App Store app (easy) or the CLI (advanced)
+
+## How a packet travels (Mac → 1.1.1.1, via Oracle)
+
+WireGuard wraps each packet in an **outer envelope** (Mac → server, UDP 443)
+around the sealed **inner packet** (tunnel address → real destination). Two NATs
+carry it the rest of the way:
+
+- **NAT #1 — in the VM, ours.** `setup.sh` PostUp adds `iptables ... MASQUERADE -o
+  ens3`; it rewrites the decrypted packet's source from the tunnel IP to the VM's
+  private IP.
+- **NAT #2 — Oracle's edge, automatic.** A 1:1 map between the VM's **public IP**
+  and its **private IP** (`10.0.0.x`): rewrites the destination inbound, the
+  source outbound.
+
+```mermaid
+flowchart LR
+    App["app on your Mac<br/>wants 1.1.1.1"] --> WG["wg0 encrypts<br/>inner: 10.8.0.2 → 1.1.1.1"]
+    WG --> NIC["Mac NIC / iPhone hotspot<br/>outer: 172.20.10.x → server-ip:443"]
+    NIC --> ATT["carrier + internet<br/>see only a sealed<br/>UDP-443 stream to the server"]
+    ATT --> IGW["Oracle Internet Gateway"]
+
+    subgraph ORACLE["☁️ Oracle"]
+        direction TB
+        IGW --> E1["edge 1:1 NAT — dst → 10.0.0.x:443<br/>(NAT #2, inbound side)"]
+        E1 --> ING{"security list:<br/>UDP 443 allowed?"}
+        ING -->|"no"| DROP["dropped"]
+        ING -->|"yes"| ENS3["VM NIC ens3 (10.0.0.x)"]
+        ENS3 --> DEC["wireguard decrypts<br/>→ inner: 10.8.0.2 → 1.1.1.1"]
+        DEC --> FWD["kernel forwards<br/>(ip_forward=1 + FORWARD accept)"]
+        FWD --> N1["iptables MASQUERADE — src → 10.0.0.x<br/>(NAT #1, ours)"]
+        N1 --> E2["edge NAT — src → server public IP<br/>(NAT #2, outbound side)"]
+    end
+    E2 --> NET(["internet sees:<br/>server-ip → 1.1.1.1"])
+```
+
+| hop | outer (envelope) | inner (sealed) |
+|---|---|---|
+| Mac, after encrypt | `172.20.10.x → server-ip:443` | `10.8.0.2 → 1.1.1.1` |
+| across carrier + net | same | unreadable |
+| Oracle edge (NAT #2) | dst → `10.0.0.x:443` | unreadable |
+| ens3 → decrypt | — opened — | `10.8.0.2 → 1.1.1.1` |
+| forward + NAT #1 | — | src → `10.0.0.x` |
+| Oracle edge (NAT #2) | — | src → `server-ip` |
+
+**Return trip** is the mirror: `1.1.1.1 → server-ip` → edge NAT → `10.0.0.x` →
+conntrack reverses the MASQUERADE → `10.8.0.2` → wireguard re-encrypts → back to
+the Mac's `wg0`, which decrypts and hands the data to the app.

@@ -75,30 +75,36 @@ flowchart LR
     S3 --> S4
     S4 --> Done(["tunnel up"])
 
-    subgraph S1["① install.sh — set up the Mac"]
-        direction TB
-        a1["install wireguard-tools<br/>+ SwiftBar"] --> a2["generate this<br/>Mac's key pair"]
+    subgraph MAC["💻 your Mac"]
+        subgraph S1["① install.sh — set up the Mac"]
+            direction TB
+            a1["install wireguard-tools<br/>+ SwiftBar"] --> a2["generate this<br/>Mac's key pair"]
+        end
+        subgraph S4["④ install.sh — finish on the Mac"]
+            direction TB
+            d1["write wg0.conf"] --> d2["boot daemon + toggle<br/>+ menu-bar button"]
+        end
     end
 
-    subgraph S2["② setup.sh — fresh server only"]
-        direction TB
-        b1["apt install wireguard"] --> b2["reuse or generate<br/>the server key"]
-        b2 --> b3["write dual-stack<br/>wg0.conf + NAT"]
-        b3 --> b4["start wg-quick@wg0"]
+    subgraph ORACLE["☁️ Oracle server — reached over SSH"]
+        subgraph S2["② setup.sh — fresh server only"]
+            direction TB
+            b1["apt install wireguard"] --> b2["reuse or generate<br/>the server key"]
+            b2 --> b3["write dual-stack<br/>wg0.conf + NAT"]
+            b3 --> b4["start wg-quick@wg0"]
+        end
+        SKIP
     end
 
     subgraph S3["③ exchange keys over SSH"]
         direction TB
         c1["Mac pubkey →<br/>server peer"] --> c2["server pubkey →<br/>Mac wg0.conf"]
     end
-
-    subgraph S4["④ install.sh — finish on the Mac"]
-        direction TB
-        d1["write wg0.conf"] --> d2["boot daemon + toggle<br/>+ menu-bar button"]
-    end
 ```
 
 **Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
+
+**Once it's running:** 📦 [how a packet actually flows](client/ARCHITECTURE.md) (Mac → carrier → Oracle, the two NATs, and back) · 🏗️ [the Oracle network you create](server/CREATE-VM.md) (VCN → subnet → ingress → VM)
 
 After it's up, `wg show` confirms the handshake:
 
