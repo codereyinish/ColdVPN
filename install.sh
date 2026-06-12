@@ -40,6 +40,7 @@ GRN=$'\033[92m'
 YLW=$'\033[93m'
 BLU=$'\033[96m'
 BLD=$'\033[1m'
+DIM=$'\033[90m'   # gray — for "where to find this" hints
 RST=$'\033[0m'
 
 # =============================================================================
@@ -50,16 +51,11 @@ ok()     { echo "  ${GRN}✓${RST} $1"; }
 info()   { echo "  ${YLW}→${RST} $1"; }
 die()    { echo ""; echo "  ${RED}✗ Error: $1${RST}"; echo ""; exit 1; }
 
-# Ask a question, store answer in a variable. Usage: ask VAR "Question" "default"
-ask() {
-    local var=$1 question=$2 default=$3
-    echo ""
-    if [ -n "$default" ]; then printf "  ${BLD}$question${RST} [${default}]: "
-    else                       printf "  ${BLD}$question${RST}: "; fi
-    read -r input
-    if [ -z "$input" ] && [ -n "$default" ]; then eval "$var=\"$default\""
-    else eval "$var=\"$input\""; fi
-}
+# ask() — interactive prompt with a grey ghost-default. It's long and hand-rolled
+# for bash 3.2, so it lives in its own file. See
+# client/decisions/07-bash-3.2-not-homebrew.md for why we target stock bash
+# instead of requiring Homebrew bash.
+source "$(cd "$(dirname "$0")" && pwd)/client/lib/prompt.sh"
 
 # =============================================================================
 # STEP 0 — Welcome
@@ -182,54 +178,101 @@ echo ""
 # =============================================================================
 # STEP 6 — Your server details
 # =============================================================================
-# Collected BEFORE the "add your key" step below, so that step can print the
-# real "ssh ubuntu@<your server IP>" instead of a vague "your server".
+# Collected up front; the installer then SSHes into the server itself (Step 7)
+# to finish the key exchange — no manual copy/paste. The server's public key is
+# NOT asked here: it's fetched over that SSH connection.
 header "Step 6/13 — Your server details"
 
-echo "  These come from your server — setup.sh prints them when it finishes."
+echo "  The installer will SSH into the server to finish setup automatically."
+echo ""
+echo "  ${DIM}Where to find these:${RST}"
+echo "  ${DIM}• Server IP → Oracle console → Compute → Instances → your instance →${RST}"
+echo "  ${DIM}             'Public IP address'  (or the line setup.sh printed at the end)${RST}"
+echo "  ${DIM}• SSH user  → 'ubuntu' on Oracle's Ubuntu image — just press Enter${RST}"
+echo "  ${DIM}• Port / VPN address / DNS → defaults are correct, just press Enter${RST}"
+echo ""
 
-ask SERVER_IP     "Server IP address (e.g. 203.0.113.10)" ""
-ask SERVER_PORT   "Server WireGuard port"                 "443"
-ask SERVER_PUBKEY "Server public key"                     ""
-ask CLIENT_ADDR   "Your VPN address (inside the tunnel)"  "10.8.0.2"
-ask DNS_SERVER    "DNS server to use"                     "1.1.1.1"
+ask SERVER_IP   "Server IP address (e.g. 203.0.113.10)" ""
+ask SSH_USER    "SSH username on the server"            "ubuntu"
+ask SERVER_PORT "Server WireGuard port"                 "443"
+ask CLIENT_ADDR "Your VPN address (inside the tunnel)"  "10.8.0.2"
+ask DNS_SERVER  "DNS server to use"                     "1.1.1.1"
 
-[ -z "$SERVER_IP" ]     && die "Server IP cannot be empty"
-[ -z "$SERVER_PUBKEY" ] && die "Server public key cannot be empty"
+[ -z "$SERVER_IP" ] && die "Server IP cannot be empty"
 
 ok "Server details collected"
 
 # =============================================================================
-# STEP 7 — Add your key to the server
+# STEP 7 — Register this Mac on the server (over SSH)
 # =============================================================================
-header "Step 7/13 — Add your key to the server"
+# Decision 06: automate the key handoff in ONE step. SSH in with YOUR key,
+# fetch the server's public key, register this Mac as a peer (REPLACING any old
+# peer so re-runs are idempotent — single-client design).
+#
+# SECURITY (decisions 05 & 06): we deliberately DO NOT pass
+# StrictHostKeyChecking=no. Host-key verification stays ON — a first-ever
+# connect prompts here (fine, the installer is interactive); a known host
+# verifies silently.
+header "Step 7/13 — Registering this Mac on the server"
 
-echo "  Your Mac's public key has to go on the server. ${BLD}Open a new terminal tab${RST}"
-echo "  and run these — then come back here:"
-echo ""
-echo "  ${BLD}1.${RST} Connect to your server:"
-echo "       ${YLW}ssh ubuntu@${SERVER_IP}${RST}"
-echo ""
-echo "  ${BLD}2.${RST} Open the WireGuard config:"
-echo "       ${YLW}sudo nano /etc/wireguard/wg0.conf${RST}"
-echo ""
-echo "  ${BLD}3.${RST} Add this block at the bottom"
-echo "     ${BLD}(or, if you've connected before, replace the existing [Peer]):${RST}"
-echo "       ${YLW}[Peer]"
-echo "       PublicKey = ${PUBLIC_KEY}"
-echo "       AllowedIPs = ${CLIENT_ADDR}/32${RST}"
-echo ""
-echo "  ${BLD}4.${RST} Save & exit nano:  ${YLW}Ctrl+O${RST} → ${YLW}Enter${RST} → ${YLW}Ctrl+X${RST}"
-echo ""
-echo "  ${BLD}5.${RST} Apply it:"
-echo "       ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
-echo ""
-read -rp "  Done? Press Enter to finish the install..."
+SSH_DEST="${SSH_USER}@${SERVER_IP}"
+SSH_OPTS="-o ConnectTimeout=10"
+
+# narration helper — prints an arrow line and pauses briefly so the flow is
+# followable rather than a wall of instant text.
+narrate() { echo "  ${BLU}→${RST} $1"; sleep 0.4; }
+
+echo "  ${BLD}┌─ over SSH ─────────────────────────────────────────${RST}"
+narrate "ssh ${SSH_DEST}  — connecting to your server..."
+if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
+    ok "you're on the server"
+
+    narrate "reading the server's identity (its public key)..."
+    SERVER_PUBKEY=$(ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0 public-key' 2>/dev/null | tr -d '[:space:]')
+    [ -z "$SERVER_PUBKEY" ] && die "Couldn't read the server's public key (is WireGuard running there?)."
+    echo "       server key   ${GRN}<--${RST} ${BLU}${SERVER_PUBKEY}${RST}"
+
+    narrate "handing the server THIS Mac's public key..."
+    echo "       your key     ${GRN}-->${RST} ${BLU}${PUBLIC_KEY}${RST}"
+
+    narrate "updating /etc/wireguard/wg0.conf on the server..."
+    ssh $SSH_OPTS "$SSH_DEST" "sudo bash -s" <<REMOTE
+set -e
+cp /etc/wireguard/wg0.conf /etc/wireguard/wg0.conf.bak
+# keep the [Interface] section (everything before the first [Peer]), drop old peers
+awk '/^\[Peer\]/{exit} {print}' /etc/wireguard/wg0.conf.bak | grep -v '^[[:space:]]*\$' > /etc/wireguard/wg0.conf.new
+printf '\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n' '$PUBLIC_KEY' '$CLIENT_ADDR' >> /etc/wireguard/wg0.conf.new
+mv /etc/wireguard/wg0.conf.new /etc/wireguard/wg0.conf
+chmod 600 /etc/wireguard/wg0.conf
+systemctl restart wg-quick@wg0
+REMOTE
+
+    narrate "server's [Peer] block is now:"
+    ssh $SSH_OPTS "$SSH_DEST" 'sudo awk "/\[Peer\]/{p=1} p" /etc/wireguard/wg0.conf' 2>/dev/null | sed "s/^/       ${YLW}|${RST} /"
+    ok "server updated + WireGuard restarted"
+    echo "  ${BLD}└────────────────────────────────────────────────────${RST}"
+else
+    echo "  ${BLD}└─ couldn't SSH in — manual fallback ────────────────${RST}"
+    info "Do it by hand instead:"
+    echo "  ${BLD}1.${RST} ${YLW}ssh ${SSH_DEST}${RST}"
+    echo "  ${BLD}2.${RST} ${YLW}sudo nano /etc/wireguard/wg0.conf${RST}"
+    echo "  ${BLD}3.${RST} Replace the existing [Peer] (or add one) with:"
+    echo "       ${YLW}[Peer]"
+    echo "       PublicKey = ${PUBLIC_KEY}"
+    echo "       AllowedIPs = ${CLIENT_ADDR}/32${RST}"
+    echo "  ${BLD}4.${RST} Save, then ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
+    echo ""
+    ask SERVER_PUBKEY "Now paste the server's public key (sudo wg show wg0 public-key)" ""
+    [ -z "$SERVER_PUBKEY" ] && die "Server public key cannot be empty"
+    read -rp "  Done on the server? Press Enter to finish..."
+fi
 
 # =============================================================================
-# STEP 8 — Create wg0.conf
+# STEP 8 — Write your Mac's WireGuard config
 # =============================================================================
-header "Step 8/13 — Creating WireGuard config"
+header "Step 8/13 — Writing your Mac's WireGuard config"
+
+echo "  ${BLU}→${RST} back on your Mac — writing ${WG_CONF_DIR}/wg0.conf"
 
 sudo mkdir -p "$WG_CONF_DIR"
 
@@ -248,7 +291,17 @@ PersistentKeepalive = 25
 EOF
 
 sudo chmod 600 "$WG_CONF_DIR/wg0.conf"
-ok "wg0.conf created at $WG_CONF_DIR/wg0.conf"
+ok "wg0.conf written"
+
+# Show what was written (private key hidden).
+echo "       ${YLW}|${RST} [Interface]"
+echo "       ${YLW}|${RST} PrivateKey = ${BLD}(hidden)${RST}"
+echo "       ${YLW}|${RST} Address    = ${CLIENT_ADDR}/32"
+echo "       ${YLW}|${RST} DNS        = ${DNS_SERVER}"
+echo "       ${YLW}|${RST} [Peer]"
+echo "       ${YLW}|${RST} PublicKey  = ${SERVER_PUBKEY}"
+echo "       ${YLW}|${RST} Endpoint   = ${SERVER_IP}:${SERVER_PORT}"
+echo "       ${YLW}|${RST} AllowedIPs = 0.0.0.0/0"
 
 # =============================================================================
 # STEP 9 — Install the toggle script
