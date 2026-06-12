@@ -27,20 +27,29 @@ flowchart TB
             direction TB
             subgraph SUB["Subnet 10.0.0.0/24 (like a LAN) · ingress UDP 443"]
                 direction TB
-                VM["VM · private IP 10.0.0.x<br/>wireguard · tunnel IP 10.8.0.2"]
+                subgraph VM["VM · private IP 10.0.0.x"]
+                    direction TB
+                    WG["wireguard process<br/>tunnel IP 10.8.0.2"]
+                    IPF["ip_forward = 1<br/>kernel routes wg0 → ens3"]
+                    OTH["…any other processes"]
+                end
             end
         end
     end
 
     NET -->|"in · UDP 443"| EDGE
-    EDGE ==>|"NAT in"| VM
-    VM ==>|"out · same ens3"| EDGE
+    EDGE ==>|"NAT in"| WG
+    WG ==>|"decrypt → forward"| IPF
+    IPF ==>|"MASQUERADE out · ens3"| EDGE
     EDGE -->|"out"| NET
 
     style ORACLE fill:none,stroke:#94a3b8,stroke-width:2px,color:#cbd5e1
     style VCN fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
     style SUB fill:none,stroke:#3b82f6,stroke-width:1.5px,color:#3b82f6
-    style VM fill:none,stroke:#22c55e,stroke-width:1.5px,color:#bbf7d0
+    style VM fill:none,stroke:#22c55e,stroke-width:2px,color:#bbf7d0
+    style WG fill:none,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style IPF fill:none,stroke:#06b6d4,stroke-width:1.5px,color:#a5f3fc
+    style OTH fill:none,stroke:#475569,stroke-width:1px,color:#94a3b8
 ```
 
 `setup.sh` later runs *inside* the VM and uses both addresses: the **public IP**
