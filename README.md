@@ -100,10 +100,6 @@ flowchart LR
 
 **Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
 
-> Why the links are listed here instead of on the boxes: GitHub sandboxes Mermaid,
-> so node clicks don't fire. The numbers ①–④ above match the diagram — that's the
-> workaround.
-
 After it's up, `wg show` confirms the handshake:
 
 ```text
