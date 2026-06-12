@@ -94,8 +94,9 @@ WireGuard is mutual — each side needs the *other's* public key. `install.sh`
 does the whole swap over one SSH connection:
 
 ```
-this Mac's key  ──up──▶   server's [Peer]
-server's key    ◀─down──  Mac's wg0.conf
+              ┌─────────── over SSH (the access you already have) ───────────┐
+this Mac's key  ──copied UP──▶   server /etc/wireguard/wg0.conf   [Peer]
+server's key    ◀──copied DOWN── server  (read live with `wg show`)   into Mac wg0.conf
 ```
 
 No manual paste — the Mac's in-tunnel address and the server's port come down the
