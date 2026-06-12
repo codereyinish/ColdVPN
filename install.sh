@@ -18,7 +18,7 @@
 #   - coldvpn.5s.sh            → your SwiftBar plugins folder  (menu-bar button)
 #
 # You provide:
-#   - Your server's IP and WireGuard public key
+#   - Your server's IP address (the installer SSHes in to discover the rest)
 #
 # Requirements:
 #   - macOS (Apple Silicon or Intel)
@@ -56,6 +56,17 @@ die()    { echo ""; echo "  ${RED}✗ Error: $1${RST}"; echo ""; exit 1; }
 # client/decisions/07-bash-3.2-not-homebrew.md for why we target stock bash
 # instead of requiring Homebrew bash.
 source "$(cd "$(dirname "$0")" && pwd)/client/lib/prompt.sh"
+
+# =============================================================================
+# CLIENT CONFIG DEFAULTS  (not prompted for)
+# =============================================================================
+# SERVER_PORT and CLIENT_ADDR are READ from the server over SSH in Step 7 — the
+# values below are just the fallback if that detection fails. DNS is a purely
+# client-side choice the server has no say in; change it here if you prefer a
+# different resolver (e.g. 9.9.9.9 for Quad9).
+DNS_SERVER="1.1.1.1"     # resolver the Mac uses inside the tunnel
+SERVER_PORT="443"        # WireGuard port — auto-read from the server in Step 7
+CLIENT_ADDR="10.8.0.2"   # this Mac's address inside the tunnel — auto-derived in Step 7
 
 # =============================================================================
 # STEP 0 — Welcome
@@ -183,13 +194,14 @@ echo ""
 # NOT asked here: it's fetched over that SSH connection.
 header "Step 6/13 — Your server details"
 
-echo "  The installer will SSH into the server to finish setup automatically."
+echo "  The installer SSHes into the server to finish setup automatically — it"
+echo "  reads the WireGuard port and your tunnel address straight from the server,"
+echo "  so all you need to give it is how to reach the box."
 echo ""
 echo "  ${DIM}Where to find these:${RST}"
 echo "  ${DIM}• Server IP → Oracle console → Compute → Instances → your instance →${RST}"
 echo "  ${DIM}             'Public IP address'  (or the line setup.sh printed at the end)${RST}"
 echo "  ${DIM}• SSH user  → 'ubuntu' on Oracle's Ubuntu image — just press Enter${RST}"
-echo "  ${DIM}• Port / VPN address / DNS → defaults are correct, just press Enter${RST}"
 echo ""
 
 # Reprompt until the IP is a valid IPv4 address.
@@ -200,10 +212,7 @@ while :; do
     info "'$SERVER_IP' isn't a valid IPv4 address (like 203.0.113.10) — try again."
 done
 
-ask SSH_USER    "SSH username on the server"            "ubuntu"
-ask SERVER_PORT "Server WireGuard port"                 "443"
-ask CLIENT_ADDR "Your VPN address (inside the tunnel)"  "10.8.0.2"
-ask DNS_SERVER  "DNS server to use"                     "1.1.1.1"
+ask SSH_USER "SSH username on the server" "ubuntu"
 
 ok "Server details collected"
 
@@ -227,6 +236,14 @@ SSH_OPTS="-o ConnectTimeout=10"
 # followable rather than a wall of instant text.
 narrate() { echo "  ${BLU}→${RST} $1"; sleep 0.4; }
 
+# Address lists default to IPv4-only; the SSH branch below upgrades them to
+# dual-stack when the server has an IPv6 address on wg0. Defined here so the
+# manual-fallback branch (no SSH) still has them.
+CLIENT_ADDR6=""
+PEER_ALLOWED="${CLIENT_ADDR}/32"   # server-side peer AllowedIPs (this Mac)
+IFACE_ADDR="${CLIENT_ADDR}/32"     # Mac [Interface] Address
+TUNNEL_ALLOWED="0.0.0.0/0"         # Mac [Peer] AllowedIPs (what to route in)
+
 echo "  ${BLD}┌─ over SSH ─────────────────────────────────────────${RST}"
 narrate "ssh ${SSH_DEST}  — connecting to your server..."
 if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
@@ -237,6 +254,33 @@ if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
     [ -z "$SERVER_PUBKEY" ] && die "Couldn't read the server's public key (is WireGuard running there?)."
     echo "       server key   ${GRN}<--${RST} ${BLU}${SERVER_PUBKEY}${RST}"
 
+    narrate "reading the server's WireGuard port + tunnel subnet..."
+    # Pipes END in tr, so the assignment's status is always 0 — safe under set -e
+    # even when ssh fails. Empty results just fall back to the defaults up top.
+    DETECTED_PORT=$(ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0 listen-port' 2>/dev/null | tr -d '[:space:]')
+    if [ -n "$DETECTED_PORT" ]; then SERVER_PORT="$DETECTED_PORT"; fi
+    SERVER_WG_ADDR=$(ssh $SSH_OPTS "$SSH_DEST" "ip -o -4 addr show wg0 2>/dev/null | awk '{print \$4}'" | cut -d/ -f1 | tr -d '[:space:]')
+    if [ -n "$SERVER_WG_ADDR" ]; then CLIENT_ADDR=$(echo "$SERVER_WG_ADDR" | awk -F. '{print $1"."$2"."$3".2"}'); fi
+    echo "       wg port      ${GRN}<--${RST} ${BLU}${SERVER_PORT}${RST}"
+    echo "       this Mac IP  ${GRN} =${RST}  ${BLU}${CLIENT_ADDR}${RST}"
+
+    # Rebuild the IPv4 address lists from the value Step 7 actually detected
+    # (the pre-SSH defaults above used the fallback CLIENT_ADDR).
+    PEER_ALLOWED="${CLIENT_ADDR}/32"
+    IFACE_ADDR="${CLIENT_ADDR}/32"
+
+    # IPv6: if the server has a global IPv6 on wg0 (e.g. fd86:…::1), mirror the
+    # IPv4 ".2" choice → fd86:…::2 and route ::/0 too, so IPv6 doesn't leak
+    # around the tunnel. Servers without IPv6 simply stay IPv4-only.
+    SERVER_WG_ADDR6=$(ssh $SSH_OPTS "$SSH_DEST" "ip -o -6 addr show wg0 scope global 2>/dev/null | awk '{print \$4}'" | cut -d/ -f1 | tr -d '[:space:]')
+    if [ -n "$SERVER_WG_ADDR6" ]; then
+        CLIENT_ADDR6="${SERVER_WG_ADDR6%::*}::2"
+        PEER_ALLOWED="${PEER_ALLOWED}, ${CLIENT_ADDR6}/128"
+        IFACE_ADDR="${IFACE_ADDR}, ${CLIENT_ADDR6}/128"
+        TUNNEL_ALLOWED="${TUNNEL_ALLOWED}, ::/0"
+        echo "       this Mac v6  ${GRN} =${RST}  ${BLU}${CLIENT_ADDR6}${RST}"
+    fi
+
     narrate "handing the server THIS Mac's public key..."
     echo "       your key     ${GRN}-->${RST} ${BLU}${PUBLIC_KEY}${RST}"
 
@@ -246,7 +290,7 @@ set -e
 cp /etc/wireguard/wg0.conf /etc/wireguard/wg0.conf.bak
 # keep the [Interface] section (everything before the first [Peer]), drop old peers
 awk '/^\[Peer\]/{exit} {print}' /etc/wireguard/wg0.conf.bak | grep -v '^[[:space:]]*\$' > /etc/wireguard/wg0.conf.new
-printf '\n[Peer]\nPublicKey = %s\nAllowedIPs = %s/32\n' '$PUBLIC_KEY' '$CLIENT_ADDR' >> /etc/wireguard/wg0.conf.new
+printf '\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n' '$PUBLIC_KEY' '$PEER_ALLOWED' >> /etc/wireguard/wg0.conf.new
 mv /etc/wireguard/wg0.conf.new /etc/wireguard/wg0.conf
 chmod 600 /etc/wireguard/wg0.conf
 systemctl restart wg-quick@wg0
@@ -264,7 +308,7 @@ else
     echo "  ${BLD}3.${RST} Replace the existing [Peer] (or add one) with:"
     echo "       ${YLW}[Peer]"
     echo "       PublicKey = ${PUBLIC_KEY}"
-    echo "       AllowedIPs = ${CLIENT_ADDR}/32${RST}"
+    echo "       AllowedIPs = ${PEER_ALLOWED}${RST}"
     echo "  ${BLD}4.${RST} Save, then ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
     echo ""
     ask SERVER_PUBKEY "Now paste the server's public key (sudo wg show wg0 public-key)" ""
@@ -281,17 +325,18 @@ echo "  ${BLU}→${RST} back on your Mac — writing ${WG_CONF_DIR}/wg0.conf"
 
 sudo mkdir -p "$WG_CONF_DIR"
 
-# AllowedIPs 0.0.0.0/0 = send all traffic through the tunnel.
+# AllowedIPs send all traffic through the tunnel — 0.0.0.0/0 for IPv4, plus ::/0
+# for IPv6 when the server supports it (so IPv6 can't leak around the tunnel).
 sudo tee "$WG_CONF_DIR/wg0.conf" > /dev/null << EOF
 [Interface]
 PrivateKey = ${PRIVATE_KEY}
-Address = ${CLIENT_ADDR}/32
+Address = ${IFACE_ADDR}
 DNS = ${DNS_SERVER}
 
 [Peer]
 PublicKey = ${SERVER_PUBKEY}
 Endpoint = ${SERVER_IP}:${SERVER_PORT}
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = ${TUNNEL_ALLOWED}
 PersistentKeepalive = 25
 EOF
 
@@ -301,12 +346,12 @@ ok "wg0.conf written"
 # Show what was written (private key hidden).
 echo "       ${YLW}|${RST} [Interface]"
 echo "       ${YLW}|${RST} PrivateKey = ${BLD}(hidden)${RST}"
-echo "       ${YLW}|${RST} Address    = ${CLIENT_ADDR}/32"
+echo "       ${YLW}|${RST} Address    = ${IFACE_ADDR}"
 echo "       ${YLW}|${RST} DNS        = ${DNS_SERVER}"
 echo "       ${YLW}|${RST} [Peer]"
 echo "       ${YLW}|${RST} PublicKey  = ${SERVER_PUBKEY}"
 echo "       ${YLW}|${RST} Endpoint   = ${SERVER_IP}:${SERVER_PORT}"
-echo "       ${YLW}|${RST} AllowedIPs = 0.0.0.0/0"
+echo "       ${YLW}|${RST} AllowedIPs = ${TUNNEL_ALLOWED}"
 
 # =============================================================================
 # STEP 9 — Install the toggle script
@@ -362,8 +407,8 @@ ok "Sudoers rule added"
 # =============================================================================
 header "Step 12/13 — Menu-bar button"
 
-DEFAULT_PLUGINS="$HOME/swiftbar-plugins"
-ask PLUGINS_DIR "SwiftBar plugins folder path" "$DEFAULT_PLUGINS"
+# Not prompted — SwiftBar's default plugins location under your home folder.
+PLUGINS_DIR="$HOME/swiftbar-plugins"
 
 mkdir -p "$PLUGINS_DIR"
 cp "$SCRIPT_DIR/coldvpn.5s.sh" "$PLUGINS_DIR/coldvpn.5s.sh"
