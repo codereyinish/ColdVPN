@@ -180,29 +180,13 @@ echo "  ${BLU}${PUBLIC_KEY}${RST}"
 echo ""
 
 # =============================================================================
-# STEP 6 — Add your key to the server
+# STEP 6 — Your server details
 # =============================================================================
-header "Step 6/13 — Add your key to the server"
+# Collected BEFORE the "add your key" step below, so that step can print the
+# real "ssh ubuntu@<your server IP>" instead of a vague "your server".
+header "Step 6/13 — Your server details"
 
-echo "  Add the public key above to your server's wg0.conf."
-echo ""
-echo "  SSH into your server and run:"
-echo "  ${YLW}sudo nano /etc/wireguard/wg0.conf${RST}"
-echo ""
-echo "  Add this at the bottom:"
-echo "  ${YLW}[Peer]"
-echo "  PublicKey = ${PUBLIC_KEY}"
-echo "  AllowedIPs = 10.8.0.2/32${RST}"
-echo ""
-echo "  Then restart WireGuard on the server:"
-echo "  ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
-echo ""
-read -rp "  Press Enter once you've done this..."
-
-# =============================================================================
-# STEP 7 — Your server details
-# =============================================================================
-header "Step 7/13 — Your server details"
+echo "  These come from your server — setup.sh prints them when it finishes."
 
 ask SERVER_IP     "Server IP address (e.g. 203.0.113.10)" ""
 ask SERVER_PORT   "Server WireGuard port"                 "443"
@@ -214,6 +198,33 @@ ask DNS_SERVER    "DNS server to use"                     "1.1.1.1"
 [ -z "$SERVER_PUBKEY" ] && die "Server public key cannot be empty"
 
 ok "Server details collected"
+
+# =============================================================================
+# STEP 7 — Add your key to the server
+# =============================================================================
+header "Step 7/13 — Add your key to the server"
+
+echo "  Your Mac's public key has to go on the server. ${BLD}Open a new terminal tab${RST}"
+echo "  and run these — then come back here:"
+echo ""
+echo "  ${BLD}1.${RST} Connect to your server:"
+echo "       ${YLW}ssh ubuntu@${SERVER_IP}${RST}"
+echo ""
+echo "  ${BLD}2.${RST} Open the WireGuard config:"
+echo "       ${YLW}sudo nano /etc/wireguard/wg0.conf${RST}"
+echo ""
+echo "  ${BLD}3.${RST} Add this block at the bottom"
+echo "     ${BLD}(or, if you've connected before, replace the existing [Peer]):${RST}"
+echo "       ${YLW}[Peer]"
+echo "       PublicKey = ${PUBLIC_KEY}"
+echo "       AllowedIPs = ${CLIENT_ADDR}/32${RST}"
+echo ""
+echo "  ${BLD}4.${RST} Save & exit nano:  ${YLW}Ctrl+O${RST} → ${YLW}Enter${RST} → ${YLW}Ctrl+X${RST}"
+echo ""
+echo "  ${BLD}5.${RST} Apply it:"
+echo "       ${YLW}sudo systemctl restart wg-quick@wg0${RST}"
+echo ""
+read -rp "  Done? Press Enter to finish the install..."
 
 # =============================================================================
 # STEP 8 — Create wg0.conf

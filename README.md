@@ -64,10 +64,6 @@ and starts the tunnel as a boot service.
 
 Keep the **public key** and **IP** — the Mac asks for them next.
 
-> **Connected but no internet?** Oracle's Ubuntu image ships a default firewall
-> `REJECT` rule. `setup.sh` already inserts WireGuard's accept rule *above* it,
-> so this should just work — but that's the rule to check if it doesn't.
-
 ---
 
 ## 2 · Mac
@@ -105,6 +101,14 @@ The Mac generates its key and **pauses** → you add it on the server → the se
 hands back its key → you finish the Mac. That handshake is the whole setup.
 
 ---
+
+## Troubleshooting
+
+Connected but something's off? Check in this order:
+
+- **No handshake / won't connect** — UDP 443 isn't open in the cloud firewall, or the server IP / port / key is wrong.
+- **Connects, but no internet** — IP forwarding or NAT isn't active on the server. *(Oracle's image also ships a default `FORWARD … REJECT` rule; `setup.sh` inserts WireGuard's accept rule above it.)*
+- **Pages won't resolve** — DNS; check the `DNS =` line in your `wg0.conf`.
 
 ## Learn more
 - **Why WireGuard? DNS through the tunnel?** → [client/ARCHITECTURE.md](client/ARCHITECTURE.md)
