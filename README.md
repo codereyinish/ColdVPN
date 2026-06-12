@@ -63,8 +63,9 @@ Left to right: your one command to a live tunnel. Each numbered stage opens up
 into what happens inside it.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
 flowchart LR
-    subgraph MAC["💻 your Mac — everything install.sh drives"]
+    subgraph MAC["💻 your Mac — install.sh drives everything"]
         direction TB
         Start(["./install.sh"]) --> S1
         S1 --> CP["CHECKPOINT —<br/>enter server IP + SSH user"]
@@ -75,37 +76,36 @@ flowchart LR
 
         subgraph S1["① set up the Mac"]
             direction TB
-            a1["install wireguard-tools<br/>+ SwiftBar"] --> a2["generate this<br/>Mac's key pair"]
+            a1["install wireguard-tools + SwiftBar"] --> a2["generate Mac key pair"]
         end
         subgraph S3["③ exchange keys (over SSH)"]
             direction TB
-            c1["Mac pubkey →<br/>server peer"] --> c2["server pubkey →<br/>Mac wg0.conf"]
+            c1["Mac pubkey → server peer"] --> c2["server pubkey → Mac wg0.conf"]
         end
         subgraph S4["④ finish on the Mac"]
             direction TB
-            d1["write wg0.conf"] --> d2["boot daemon + toggle<br/>+ menu-bar button"]
+            d1["write wg0.conf"] --> d2["boot daemon + toggle + menu-bar"]
         end
     end
 
-    Q -->|"fresh"| S2
+    Q -->|"fresh"| b1
     Q -->|"existing"| SKIP
-    S2 --> S3
+    b4 --> S3
     SKIP --> S3
 
-    subgraph ORACLE["☁️ Oracle server"]
+    subgraph ORACLE["☁️ Oracle server — ② setup.sh (fresh only)"]
         direction TB
-        subgraph S2["② setup.sh — fresh server only"]
-            direction TB
-            b1["apt install wireguard"] --> b2["reuse or generate<br/>the server key"]
-            b2 --> b3["write dual-stack<br/>wg0.conf + NAT"]
-            b3 --> b4["start wg-quick@wg0"]
-        end
-        SKIP["skip setup —<br/>never re-keyed"]
+        b1["apt install wireguard"] --> b2["reuse or generate server key"]
+        b2 --> b3["write dual-stack wg0.conf + NAT"]
+        b3 --> b4["start wg-quick@wg0"]
+        SKIP["skip setup — never re-keyed"]
     end
 
-    style MAC fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    style ORACLE fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    style S2 fill:#faf5ff,stroke:#7c3aed
+    style MAC fill:none,stroke:#3b82f6,stroke-width:2px,color:#3b82f6
+    style ORACLE fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
+    style S1 fill:none,stroke:#3b82f6
+    style S3 fill:none,stroke:#3b82f6
+    style S4 fill:none,stroke:#3b82f6
 ```
 
 **Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
