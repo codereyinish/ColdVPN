@@ -112,16 +112,6 @@ flowchart LR
 
 **Once it's running:** 📦 [how a packet actually flows](client/PACKET-FLOW.md) (Mac → carrier → Oracle, the two NATs, and back) · 🏗️ [the Oracle network you create](server/CREATE-VM.md) (VCN → subnet → ingress → VM)
 
-After it's up, `wg show` confirms the handshake:
-
-```text
-interface: wg0
-peer: <server public key>
-  endpoint: <server-ip>:443
-  latest handshake: 8 seconds ago
-  transfer: 1.1 KiB received, 2.8 KiB sent
-```
-
 ---
 
 ## Troubleshooting
