@@ -55,19 +55,43 @@ button to toggle the tunnel off and back on.
 
 ---
 
-## How the two keys meet
+## How it works
 
-WireGuard is mutual — each side needs the *other's* public key. `install.sh`
-does the whole swap over one SSH connection:
+The whole flow, from your one command to a live tunnel. Nodes link to the
+relevant doc.
 
+```mermaid
+flowchart TD
+    A(["You run ./install.sh on the Mac"]) --> B["install.sh: install wireguard-tools + SwiftBar,<br/>generate this Mac's key pair"]
+    B --> C["CHECKPOINT — you enter the server's<br/>public IP + SSH username"]
+    C --> D["install.sh SSHes into the server"]
+    D --> E{"Server already set up?<br/>(does wg0 exist)"}
+    E -->|"no — fresh VM"| F["run setup.sh on the server, over SSH"]
+    F --> G["setup.sh: install WireGuard, reuse or generate<br/>the server key, write dual-stack wg0.conf + NAT,<br/>start wg-quick@wg0"]
+    E -->|"yes"| H["skip setup — leave as-is<br/>(server is never re-keyed)"]
+    G --> I["exchange keys over the same SSH —<br/>Mac public key to the server peer,<br/>server public key into the Mac's wg0.conf"]
+    H --> I
+    I --> J["install.sh writes wg0.conf and installs the<br/>boot daemon, toggle, and menu-bar button"]
+    J --> K(["tunnel up — verify with curl ifconfig.me and wg show"])
+
+    click B "client/ARCHITECTURE.md" "How the Mac client is built"
+    click D "client/decisions/05-ssh-trust-model.md" "Why SSH, and its trust tradeoffs"
+    click F "server/CREATE-VM.md" "How the server VM is created by hand"
+    click G "server/setup.sh" "The server setup script"
+    click I "client/decisions/06-automate-key-handoff-over-ssh.md" "Why the key handoff is automated over SSH"
 ```
-              ┌─────────── over SSH (the access you already have) ───────────┐
-this Mac's key  ──copied UP──▶   server /etc/wireguard/wg0.conf   [Peer]
-server's key    ◀──copied DOWN── server  (read live with `wg show`)   into Mac wg0.conf
-```
 
-No manual paste — the Mac's in-tunnel address and the server's port come down the
-same read. ([why SSH](client/decisions/06-automate-key-handoff-over-ssh.md))
+Links: [client build](client/ARCHITECTURE.md) · [create the VM](server/CREATE-VM.md) · [why automate SSH](client/decisions/06-automate-key-handoff-over-ssh.md) · [SSH trust + flaws](client/decisions/05-ssh-trust-model.md)
+
+At the end, `wg show` confirms the link is live:
+
+```text
+interface: wg0
+peer: <server public key>
+  endpoint: <server-ip>:443
+  latest handshake: 8 seconds ago
+  transfer: 1.1 KiB received, 2.8 KiB sent
+```
 
 ---
 
