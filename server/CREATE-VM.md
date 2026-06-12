@@ -15,31 +15,41 @@ Creating an instance in Oracle also creates the network around it. Think of the
 host on that LAN. The only thing you usually add by hand is the **ingress rule**.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
-flowchart TD
-    Net["INTERNET"] --> IGW["Internet Gateway"]
-    IGW --> VCN
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'},'flowchart':{'padding':22,'nodeSpacing':55,'rankSpacing':70}}}%%
+flowchart TB
+    NET["INTERNET"]
 
-    subgraph VCN["CLOUD · VCN — like a MAN"]
+    subgraph ORACLE["ORACLE — the host"]
         direction TB
-        subgraph SUB["Subnet — like a LAN"]
+        EDGE["ens3 · public NIC<br/>Public IP: server-ip<br/>edge 1:1 NAT ⇄ 10.0.0.x"]
+
+        subgraph VCN["VCN — your cloud network (like a MAN)"]
             direction TB
-            SL["Security List<br/>ingress UDP 443<br/>← the one rule you add"]
-            VM["VM — Ubuntu 22.04<br/>NIC ens3 · 10.0.0.x (private)"]
-            SL -.->|"allows :443"| VM
+            subgraph SUB["Subnet 10.0.0.0/24 — like a LAN<br/>Security List: ingress UDP 443 ← you add this"]
+                direction TB
+                subgraph VM["VM — private IP 10.0.0.x"]
+                    direction TB
+                    WG["wireguard process<br/>tunnel IP 10.8.0.2"]
+                end
+            end
         end
     end
 
-    PUB["Public IP<br/>(server-ip)"] -. "edge 1:1 NAT" .-> VM
+    NET -->|"in · UDP 443"| EDGE
+    EDGE ==>|"NAT in → drills to the VM"| WG
+    WG ==>|"out · same ens3 + NAT"| EDGE
+    EDGE -->|"out · to the internet"| NET
 
+    style ORACLE fill:none,stroke:#94a3b8,stroke-width:2px,color:#cbd5e1
     style VCN fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
     style SUB fill:none,stroke:#3b82f6,stroke-width:1.5px,color:#3b82f6
     style VM fill:none,stroke:#22c55e,stroke-width:1.5px,color:#22c55e
+    style WG fill:none,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
 ```
 
 `setup.sh` later runs *inside* the VM and uses both addresses: the **public IP**
 is how clients reach it, and the **private `ens3` IP** is what NAT masquerades
-traffic to on the way out. ([full packet path](../client/ARCHITECTURE.md))
+traffic to on the way out. ([full packet path](../client/PACKET-FLOW.md))
 
 ---
 
@@ -68,13 +78,5 @@ Default Security List → Add Ingress Rule**
 > The VCN and subnet are created automatically with the instance — usually you
 > only add this one ingress rule.
 
-## 4. Log in
-```bash
-ssh ubuntu@<your-server-ip>
-```
-
-Then come back to the [README](../README.md) and run the server installer.
-
----
-
-> 🚧 **TODO:** expand with screenshots and a full click-through walkthrough.
+That's the whole manual part. Now run **`./install.sh` on your Mac** — it SSHes
+into this box and sets WireGuard up for you. ([README](../README.md))
