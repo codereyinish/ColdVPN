@@ -13,7 +13,15 @@ PLIST="/Library/LaunchDaemons/${LABEL}.plist"
 WG="/opt/homebrew/bin/wg"
 WG_QUICK="/opt/homebrew/bin/wg-quick"
 
-is_up() { "$WG" show "$WG_IF" >/dev/null 2>&1; }
+# macOS quirk: wg-quick maps wg0 → a utunN interface and records the real name in
+# /var/run/wireguard/wg0.name. `wg show wg0` does NOT follow that mapping — it
+# looks for a literal "wg0" interface and fails ("No such file or directory") —
+# so resolve the real name first, then query that. Tunnel down = no .name file.
+is_up() {
+    local tun
+    tun=$(cat "/var/run/wireguard/${WG_IF}.name" 2>/dev/null) || return 1
+    [ -n "$tun" ] && "$WG" show "$tun" >/dev/null 2>&1
+}
 
 vpn_on() {
     /bin/launchctl enable "system/${LABEL}" 2>/dev/null
