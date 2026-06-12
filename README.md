@@ -31,15 +31,23 @@ cd ColdVPN
 ./install.sh
 ```
 
-It pauses once — give it your **server IP** and **SSH user**:
+Partway through, it asks for the server's **public IP** — grab it from the Oracle
+console under *Instances → your instance → Public IP address* — and the **SSH
+username** (`ubuntu` on Oracle's image). Enter those and `install.sh` takes over:
+SSHes in, sets up the server if it's fresh, swaps keys, and brings the tunnel up.
 
-- **IP** — Oracle console → Instances → *Public IP address*
-- **SSH user** — `ubuntu` (default; just press Enter)
+When it finishes, the **ColdVPN** button shows up in your menu bar:
 
-That's the last manual step. `install.sh` SSHes in
-([why](client/decisions/06-automate-key-handoff-over-ssh.md)), sets the server up
-if it's fresh, swaps keys, and brings the tunnel up — `curl ifconfig.me` then
-shows your server's IP.
+![ColdVPN menu-bar button](docs/menubar.png)
+
+### Test it's working
+
+```bash
+curl ifconfig.me
+```
+
+It should print your **server's IP** — not your home one. Click the menu-bar
+button to toggle the tunnel off and back on.
 
 > **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
 > *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.
