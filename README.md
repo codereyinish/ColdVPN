@@ -31,10 +31,12 @@ cd ColdVPN
 ./install.sh
 ```
 
-Partway through, it asks for the server's **public IP** — grab it from the Oracle
-console under *Instances → your instance → Public IP address* — and the **SSH
-username** (`ubuntu` on Oracle's image). Enter those and `install.sh` takes over:
-SSHes in, sets up the server if it's fresh, swaps keys, and brings the tunnel up.
+Partway through, it asks you for two things:
+
+- **Server public IP** — Oracle console → *Instances → your instance → Public IP address*
+- **SSH username** — `ubuntu` (Oracle's default image)
+
+Enter those — that's the last thing you do by hand.
 
 When it finishes, the **ColdVPN** button shows up in your menu bar:
 
