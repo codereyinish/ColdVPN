@@ -64,42 +64,48 @@ into what happens inside it.
 
 ```mermaid
 flowchart LR
-    Start(["./install.sh<br/>on the Mac"]) --> S1
-    S1 --> CP["CHECKPOINT —<br/>you enter server<br/>IP + SSH user"]
-    CP --> SSH["SSH into<br/>the server"]
-    SSH --> Q{"wg0<br/>exists?"}
-    Q -->|"fresh"| S2
-    Q -->|"existing"| SKIP["skip setup —<br/>never re-keyed"]
-    S2 --> S3
-    SKIP --> S3
-    S3 --> S4
-    S4 --> Done(["tunnel up"])
+    subgraph MAC["💻 your Mac — everything install.sh drives"]
+        direction TB
+        Start(["./install.sh"]) --> S1
+        S1 --> CP["CHECKPOINT —<br/>enter server IP + SSH user"]
+        CP --> SSH["SSH into the server"]
+        SSH --> Q{"wg0 exists?"}
+        S3 --> S4
+        S4 --> Done(["tunnel up"])
 
-    subgraph MAC["💻 your Mac"]
-        subgraph S1["① install.sh — set up the Mac"]
+        subgraph S1["① set up the Mac"]
             direction TB
             a1["install wireguard-tools<br/>+ SwiftBar"] --> a2["generate this<br/>Mac's key pair"]
         end
-        subgraph S4["④ install.sh — finish on the Mac"]
+        subgraph S3["③ exchange keys (over SSH)"]
+            direction TB
+            c1["Mac pubkey →<br/>server peer"] --> c2["server pubkey →<br/>Mac wg0.conf"]
+        end
+        subgraph S4["④ finish on the Mac"]
             direction TB
             d1["write wg0.conf"] --> d2["boot daemon + toggle<br/>+ menu-bar button"]
         end
     end
 
-    subgraph ORACLE["☁️ Oracle server — reached over SSH"]
+    Q -->|"fresh"| S2
+    Q -->|"existing"| SKIP
+    S2 --> S3
+    SKIP --> S3
+
+    subgraph ORACLE["☁️ Oracle server"]
+        direction TB
         subgraph S2["② setup.sh — fresh server only"]
             direction TB
             b1["apt install wireguard"] --> b2["reuse or generate<br/>the server key"]
             b2 --> b3["write dual-stack<br/>wg0.conf + NAT"]
             b3 --> b4["start wg-quick@wg0"]
         end
-        SKIP
+        SKIP["skip setup —<br/>never re-keyed"]
     end
 
-    subgraph S3["③ exchange keys over SSH"]
-        direction TB
-        c1["Mac pubkey →<br/>server peer"] --> c2["server pubkey →<br/>Mac wg0.conf"]
-    end
+    style MAC fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    style ORACLE fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    style S2 fill:#faf5ff,stroke:#7c3aed
 ```
 
 **Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
