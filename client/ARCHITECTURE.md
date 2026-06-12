@@ -39,23 +39,23 @@ carry it the rest of the way:
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
 flowchart LR
-    App["💻 app on your Mac<br/>wants 1.1.1.1"] --> WG["🔒 wg0 encrypts<br/>inner: 10.8.0.2 → 1.1.1.1"]
-    WG --> NIC["📤 Mac NIC / iPhone hotspot<br/>outer: 172.20.10.x → server-ip:443"]
-    NIC --> ATT["📡 carrier + internet<br/>see only a sealed<br/>UDP-443 stream to the server"]
-    ATT --> IGW["🌐 Oracle Internet Gateway"]
+    App["MAC — app wants 1.1.1.1"] --> WG["wg0 encrypts<br/>inner: 10.8.0.2 → 1.1.1.1"]
+    WG --> NIC["Mac NIC / iPhone hotspot<br/>outer: 172.20.10.x → server-ip:443"]
+    NIC --> ATT["CARRIER + internet<br/>see only a sealed<br/>UDP-443 stream to the server"]
+    ATT --> IGW["Oracle Internet Gateway"]
 
-    subgraph ORACLE["☁️ Oracle"]
+    subgraph ORACLE["CLOUD — Oracle"]
         direction TB
         IGW --> E1["edge 1:1 NAT — dst → 10.0.0.x:443<br/>(NAT #2, inbound)"]
-        E1 --> ING{"🛡️ security list:<br/>UDP 443 allowed?"}
-        ING -->|"no"| DROP["⛔ dropped"]
-        ING -->|"yes"| ENS3["🖥️ VM NIC ens3 (10.0.0.x)"]
-        ENS3 --> DEC["🔓 wireguard decrypts<br/>→ 10.8.0.2 → 1.1.1.1"]
-        DEC --> FWD["➡️ kernel forwards<br/>(ip_forward=1 + FORWARD accept)"]
-        FWD --> N1["🔁 iptables MASQUERADE<br/>src → 10.0.0.x (NAT #1, ours)"]
-        N1 --> E2["↩️ edge NAT<br/>src → server-ip (NAT #2, outbound)"]
+        E1 --> ING{"security list:<br/>UDP 443 allowed?"}
+        ING -->|"no"| DROP["dropped"]
+        ING -->|"yes"| ENS3["VM — NIC ens3 (10.0.0.x)"]
+        ENS3 --> DEC["wireguard decrypts<br/>→ 10.8.0.2 → 1.1.1.1"]
+        DEC --> FWD["kernel forwards<br/>(ip_forward=1 + FORWARD accept)"]
+        FWD --> N1["iptables MASQUERADE<br/>src → 10.0.0.x (NAT #1, ours)"]
+        N1 --> E2["edge NAT<br/>src → server-ip (NAT #2, outbound)"]
     end
-    E2 --> NET(["🌍 internet sees:<br/>server-ip → 1.1.1.1"])
+    E2 --> NET(["INTERNET sees:<br/>server-ip → 1.1.1.1"])
 
     style ORACLE fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
 ```
@@ -75,18 +75,18 @@ conntrack, then WireGuard re-wraps it:
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
 flowchart LR
-    Net(["🌍 1.1.1.1 replies<br/>→ server-ip"]) --> IGW["🌐 Oracle Internet Gateway"]
+    Net(["INTERNET — 1.1.1.1 replies<br/>→ server-ip"]) --> IGW["Oracle Internet Gateway"]
 
-    subgraph ORACLE["☁️ Oracle"]
+    subgraph ORACLE["CLOUD — Oracle"]
         direction TB
-        IGW --> E2["↪️ edge NAT — dst → 10.0.0.x<br/>(NAT #2, reversed)"]
-        E2 --> CT["🔁 conntrack reverses MASQUERADE<br/>dst → 10.8.0.2 (NAT #1, reversed)"]
-        CT --> ENC["🔒 wireguard re-encrypts<br/>outer: server-ip → 172.20.10.x"]
+        IGW --> E2["edge NAT — dst → 10.0.0.x<br/>(NAT #2, reversed)"]
+        E2 --> CT["conntrack reverses MASQUERADE<br/>dst → 10.8.0.2 (NAT #1, reversed)"]
+        CT --> ENC["wireguard re-encrypts<br/>outer: server-ip → 172.20.10.x"]
     end
 
-    ENC --> ATT["📡 carrier + internet<br/>(sealed again)"]
-    ATT --> WG["🔓 Mac wg0 decrypts"]
-    WG --> App(["💻 hands data to the app"])
+    ENC --> ATT["CARRIER + internet<br/>(sealed again)"]
+    ATT --> WG["Mac wg0 decrypts"]
+    WG --> App(["MAC — hands data to the app"])
 
     style ORACLE fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
 ```

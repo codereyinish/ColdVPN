@@ -17,21 +17,21 @@ host on that LAN. The only thing you usually add by hand is the **ingress rule**
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
 flowchart TD
-    Net["🌍 Internet"] --> IGW["🌐 Internet Gateway"]
+    Net["INTERNET"] --> IGW["Internet Gateway"]
     IGW --> VCN
 
-    subgraph VCN["☁️ VCN — your cloud network (like a MAN)"]
+    subgraph VCN["CLOUD — VCN (your cloud network, like a MAN)"]
         direction TB
-        subgraph SUB["🔌 Subnet (like a LAN) · Security List ingress: UDP 443 from 0.0.0.0/0 ← you add this"]
+        subgraph SUB["Subnet (like a LAN) · Security List ingress: UDP 443 from 0.0.0.0/0 ← you add this"]
             direction TB
-            subgraph VM["🖥️ VM instance — Ubuntu 22.04"]
+            subgraph VM["VM instance — Ubuntu 22.04"]
                 direction TB
                 ENS3["NIC ens3 — private IP 10.0.0.x"]
             end
         end
     end
 
-    PUB["📡 Public IP (server-ip)"] -. "edge 1:1 NAT" .-> VM
+    PUB["Public IP (server-ip)"] -. "edge 1:1 NAT" .-> VM
 
     style VCN fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
     style SUB fill:none,stroke:#3b82f6,stroke-width:1.5px,color:#3b82f6
