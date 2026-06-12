@@ -65,7 +65,7 @@ into what happens inside it.
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'}}}%%
 flowchart LR
-    subgraph MAC["💻 your Mac — install.sh drives everything"]
+    subgraph MAC["MAC — install.sh drives everything"]
         direction TB
         Start(["./install.sh"]) --> S1
         S1 --> CP["CHECKPOINT —<br/>enter server IP + SSH user"]
@@ -93,7 +93,7 @@ flowchart LR
     b4 --> S3
     SKIP --> S3
 
-    subgraph ORACLE["☁️ Oracle server — ② setup.sh (fresh only)"]
+    subgraph ORACLE["CLOUD — Oracle server · ② setup.sh (fresh only)"]
         direction TB
         b1["apt install wireguard"] --> b2["reuse or generate server key"]
         b2 --> b3["write dual-stack wg0.conf + NAT"]
