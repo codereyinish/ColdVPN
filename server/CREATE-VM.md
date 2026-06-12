@@ -15,36 +15,32 @@ Creating an instance in Oracle also creates the network around it. Think of the
 host on that LAN. The only thing you usually add by hand is the **ingress rule**.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'},'flowchart':{'padding':22,'nodeSpacing':55,'rankSpacing':70}}}%%
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'14px'},'flowchart':{'padding':18,'nodeSpacing':50,'rankSpacing':60,'subGraphTitleMargin':{'top':6,'bottom':16}}}}%%
 flowchart TB
     NET["INTERNET"]
 
     subgraph ORACLE["ORACLE — the host"]
         direction TB
-        EDGE["ens3 · public NIC<br/>Public IP: server-ip<br/>edge 1:1 NAT ⇄ 10.0.0.x"]
+        EDGE["ens3 · public NIC · Public IP server-ip<br/>edge 1:1 NAT ⇄ 10.0.0.x"]
 
-        subgraph VCN["VCN — your cloud network (like a MAN)"]
+        subgraph VCN["VCN (like a MAN)"]
             direction TB
-            subgraph SUB["Subnet 10.0.0.0/24 — like a LAN<br/>Security List: ingress UDP 443 ← you add this"]
+            subgraph SUB["Subnet 10.0.0.0/24 (like a LAN) · ingress UDP 443"]
                 direction TB
-                subgraph VM["VM — private IP 10.0.0.x"]
-                    direction TB
-                    WG["wireguard process<br/>tunnel IP 10.8.0.2"]
-                end
+                VM["VM · private IP 10.0.0.x<br/>wireguard · tunnel IP 10.8.0.2"]
             end
         end
     end
 
     NET -->|"in · UDP 443"| EDGE
-    EDGE ==>|"NAT in → drills to the VM"| WG
-    WG ==>|"out · same ens3 + NAT"| EDGE
-    EDGE -->|"out · to the internet"| NET
+    EDGE ==>|"NAT in"| VM
+    VM ==>|"out · same ens3"| EDGE
+    EDGE -->|"out"| NET
 
     style ORACLE fill:none,stroke:#94a3b8,stroke-width:2px,color:#cbd5e1
     style VCN fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
     style SUB fill:none,stroke:#3b82f6,stroke-width:1.5px,color:#3b82f6
-    style VM fill:none,stroke:#22c55e,stroke-width:1.5px,color:#22c55e
-    style WG fill:none,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+    style VM fill:none,stroke:#22c55e,stroke-width:1.5px,color:#bbf7d0
 ```
 
 `setup.sh` later runs *inside* the VM and uses both addresses: the **public IP**
