@@ -192,13 +192,18 @@ echo "  ${DIM}• SSH user  → 'ubuntu' on Oracle's Ubuntu image — just press
 echo "  ${DIM}• Port / VPN address / DNS → defaults are correct, just press Enter${RST}"
 echo ""
 
-ask SERVER_IP   "Server IP address (e.g. 203.0.113.10)" ""
+# Reprompt until the IP is a valid IPv4 address.
+while :; do
+    ask SERVER_IP "Server IP address (e.g. 203.0.113.10)" ""
+    if [ -z "$SERVER_IP" ]; then info "Server IP can't be empty — try again."; continue; fi
+    if valid_ipv4 "$SERVER_IP"; then break; fi
+    info "'$SERVER_IP' isn't a valid IPv4 address (like 203.0.113.10) — try again."
+done
+
 ask SSH_USER    "SSH username on the server"            "ubuntu"
 ask SERVER_PORT "Server WireGuard port"                 "443"
 ask CLIENT_ADDR "Your VPN address (inside the tunnel)"  "10.8.0.2"
 ask DNS_SERVER  "DNS server to use"                     "1.1.1.1"
-
-[ -z "$SERVER_IP" ] && die "Server IP cannot be empty"
 
 ok "Server details collected"
 

@@ -17,26 +17,43 @@
 ask() {
     local var=$1 question=$2 default=$3 input="" ch junk
     printf "\n  ${BLD}%s${RST}: " "$question"
-    _draw_ghost() { [ -n "$default" ] && { printf '\033[s'; printf "${DIM}%s${RST}" "$default"; printf '\033[u'; }; }
+    # Draw the grey ghost default (no-op if no default). MUST return 0 — under
+    # the installer's `set -e`, a bare call returning non-zero would exit the
+    # whole script (this bit us when the IP prompt had an empty default).
+    _draw_ghost() {
+        [ -n "$default" ] || return 0
+        printf '\033[s'; printf "${DIM}%s${RST}" "$default"; printf '\033[u'
+        return 0
+    }
     _draw_ghost
     while IFS= read -rsn1 ch; do
         case "$ch" in
             '')                                          # Enter → accept
-                [ -z "$input" ] && [ -n "$default" ] && printf "\033[K%s" "$default"
+                if [ -z "$input" ] && [ -n "$default" ]; then printf "\033[K%s" "$default"; fi
                 break ;;
-            $'\033') read -rsn2 -t 1 junk 2>/dev/null ;; # ESC: swallow arrow-key sequence, ignore
+            $'\033') read -rsn2 -t 1 junk 2>/dev/null || true ;;  # ESC: swallow arrow seq, ignore
             $'\t')   : ;;                                # Tab: ignore (ghost stays)
             $'\177'|$'\b')                               # backspace
                 if [ -n "$input" ]; then
                     input="${input%?}"; printf '\b \b'
-                    [ -z "$input" ] && { printf '\033[K'; _draw_ghost; }   # empty again → ghost back
+                    if [ -z "$input" ]; then printf '\033[K'; _draw_ghost; fi   # empty → ghost back
                 fi ;;
             [[:print:]])                                 # a real printable char
-                [ -z "$input" ] && printf '\033[K'       # first real char wipes the ghost
+                if [ -z "$input" ]; then printf '\033[K'; fi   # first real char wipes the ghost
                 input+="$ch"; printf '%s' "$ch" ;;
             *) : ;;                                       # any other control char: ignore
         esac
     done
     printf '\n'
     eval "$var=\"${input:-$default}\""
+}
+
+# True if $1 is a syntactically valid IPv4 address (e.g. 203.0.113.10).
+valid_ipv4() {
+    local ip=$1 a b c d e o
+    case $ip in ''|*[!0-9.]*) return 1 ;; esac          # non-empty, only digits and dots
+    IFS=. read -r a b c d e <<< "$ip"
+    [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ -n "$d" ] && [ -z "$e" ] || return 1
+    for o in "$a" "$b" "$c" "$d"; do (( 10#$o <= 255 )) || return 1; done
+    return 0
 }
