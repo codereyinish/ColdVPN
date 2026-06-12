@@ -20,18 +20,17 @@ flowchart TD
     Net["INTERNET"] --> IGW["Internet Gateway"]
     IGW --> VCN
 
-    subgraph VCN["CLOUD — VCN (your cloud network, like a MAN)"]
+    subgraph VCN["CLOUD · VCN — like a MAN"]
         direction TB
-        subgraph SUB["Subnet (like a LAN) · Security List ingress: UDP 443 from 0.0.0.0/0 ← you add this"]
+        subgraph SUB["Subnet — like a LAN"]
             direction TB
-            subgraph VM["VM instance — Ubuntu 22.04"]
-                direction TB
-                ENS3["NIC ens3 — private IP 10.0.0.x"]
-            end
+            SL["Security List<br/>ingress UDP 443<br/>← the one rule you add"]
+            VM["VM — Ubuntu 22.04<br/>NIC ens3 · 10.0.0.x (private)"]
+            SL -.->|"allows :443"| VM
         end
     end
 
-    PUB["Public IP (server-ip)"] -. "edge 1:1 NAT" .-> VM
+    PUB["Public IP<br/>(server-ip)"] -. "edge 1:1 NAT" .-> VM
 
     style VCN fill:none,stroke:#8b5cf6,stroke-width:2px,color:#8b5cf6
     style SUB fill:none,stroke:#3b82f6,stroke-width:1.5px,color:#3b82f6
