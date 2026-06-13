@@ -253,7 +253,7 @@ if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
     # if it isn't set up yet. An existing wg0 is left untouched (never re-keyed),
     # so running this against a live server is safe.
     if ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0' >/dev/null 2>&1; then
-        ok "server already has WireGuard (wg0) — leaving it as-is"
+        ok "server already set up — keeping its key (skipping setup.sh); its peer is updated below"
     else
         narrate "fresh server — installing WireGuard (one-time setup.sh over SSH)..."
         ssh $SSH_OPTS "$SSH_DEST" 'curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash'
