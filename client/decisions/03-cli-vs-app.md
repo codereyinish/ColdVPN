@@ -1,55 +1,39 @@
-# Decision: WireGuard CLI vs the App Store app (we ship both)
+# Decision: the WireGuard CLI, not the Mac App Store app
 
-macOS has **two separate WireGuard things**, for different needs:
+The obvious easy choice would have been the official **WireGuard app** from the
+Mac App Store. And it's genuinely tempting: it ships a proper **Network Extension**
+(the real macOS VPN API), a clean GUI, **On-Demand** auto-connect, native stats —
+and a user would set it up by just **importing the `wg0.conf`** and clicking
+connect. Zero terminal, nothing to script.
 
-```
-WireGuard GUI app  -> Mac App Store -> menu-bar toggle, On-Demand auto-connect,
-                                        built-in stats; NOT scriptable, tunnel is sandboxed
-wireguard-tools    -> Homebrew      -> the CLI: wg, wg-quick; scriptable, tunnel is CLI-readable
-```
+So why build ColdVPN on the `wireguard-tools` **CLI** (Homebrew) instead?
 
-Both are official, **open-source** WireGuard code (`git.zx2c4.com/wireguard-apple`
-for the apps, `wireguard-tools` for the CLI). The App Store build is just a signed
-build of that source.
+**Because ColdVPN is driven by scripts, not clicks.** Three pieces depend on that,
+and none of them work with the app:
 
-## Why we used the CLI (Homebrew) first
-The first version had a **custom live-stats widget**. Stats come from
-`wg show all dump` — which can **only read a wg-quick-managed tunnel**. The GUI app
-runs its tunnel inside a **sandboxed NetworkExtension the CLI can't see**, so the
-app's tunnel would have been invisible to the stats script. To get readable stats
-we *had* to use `wg-quick` (CLI) — that's why Homebrew was the choice. (It also
-needed a passwordless-sudo rule, since `wg`/`wg-quick` need root and you can't
-prompt for a password every 10s during a stats poll or a launchd auto-connect.)
+- **`install.sh` brings the tunnel up itself** — `wg-quick up`, after writing the
+  config. The app would need a human to import the file and click connect.
+- **The menu-bar toggle** runs `wg-quick up`/`down` and reads live state from
+  `wg show`. The app runs its tunnel inside a **sandboxed Network Extension the
+  shell can't see or control** — so there'd be no scriptable on/off and no 🟢/🔴
+  status button at all.
+- **Full `wg-quick` control** — the routing split, DNS, `PostUp` hooks — is CLI-only.
 
-## Why the app makes sense now
-The GUI app shows its **own** stats, plus the toggle and **On-Demand** auto-connect
-— all native. So the entire reason we needed the CLI (custom stats) disappears for
-someone who just wants a working VPN.
+The app gives you a button *you* click; the CLI gives you something you can
+*automate*. ColdVPN's whole point — one-command install, a scriptable toggle,
+manual off-after-reboot — only exists on the CLI side.
 
-## What the CLI path unlocks (and the app can't)
-The App Store app is sandboxed and shows only *its own* client-side stats. The CLI
-path is scriptable, so it's the foundation for a **custom menu-bar widget** the app
-could never be — including **server-side** metrics pulled from the VPS over SSH:
+There's even a flip side: the app's headline feature, **On-Demand auto-connect**, is
+exactly what ColdVPN *doesn't* want — it's deliberately manual, off after every
+reboot. So the app's biggest convenience cuts *against* the design.
 
 ```
-- VPS load / CPU
-- active connections (threads)
-- round-trip latency to the server
+WireGuard app          -> easiest for a human; sandboxed NE; click-only; not scriptable
+wireguard-tools (CLI)  -> scriptable: powers install.sh, the toggle, and wg-show status
 ```
 
-That's the real reason to keep the CLI on the developer path: end-to-end
-monitoring *you* control — your client stats *and* your server's health in one
-place, not just an on/off toggle. (Planned — see future work.)
-
-## Decision: ship both, tiered
-- **Easy path (default):** the App Store app — install, import config, toggle from
-  the menu bar, On-Demand for auto-connect. Zero terminal. For most people.
-- **Advanced path:** the `wg-quick` CLI + launchd scripts — scriptable, customizable,
-  CLI-readable stats. For tinkering and future extensions.
-
-```
-GUI app -> easiest; built-in stats/toggle/auto-connect; sandboxed (no CLI access)
-CLI     -> scriptable; CLI-readable stats; but you build the UI + sudo setup
-```
-
-Non-devs take the app; power users (and future-us) keep the CLI. Nothing wasted.
+**Decision: CLI only.** The app is the right tool if you just want to click a
+config into a GUI — but it can't be the backbone of an automated, toggle-driven,
+manual VPN. That's the CLI's job. (The CLI also leaves room for a custom
+client-plus-server monitor the sandboxed app could never expose — see
+`client/coldvpn-monitor`.)

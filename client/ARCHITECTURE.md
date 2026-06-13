@@ -9,7 +9,7 @@ notes, written as the reasoning, not just the result.
 |---|----------|-----|
 | [01](decisions/01-wireguard-vs-tls-relay.md) | WireGuard, not a TLS relay | a TLS relay is TCP-in-TCP (melts down on lossy links), TCP-only (leaks UDP/QUIC), and a shared token is weaker than asymmetric keys |
 | [02](decisions/02-mac-not-iphone.md) | The Mac runs the VPN, not the iPhone | iOS can't tunnel a tethered Mac and needs a $99 entitlement; macOS does it free |
-| [03](decisions/03-cli-vs-app.md) | CLI vs the App Store app (ship both) | the app's tunnel is sandboxed (no CLI stats) — so we used the CLI for a custom widget; now the app shows stats natively, so we offer both |
+| [03](decisions/03-cli-vs-app.md) | The CLI, not the WireGuard app | the App Store app is easy (Network Extension, GUI, import-and-click) but its tunnel is a sandboxed NE the shell can't drive — ColdVPN needs `wg-quick`/`wg show` for install.sh, the toggle, and the menu-bar status |
 | [04](decisions/04-dns-through-tunnel.md) | DNS through the tunnel, not direct | resolving direct leaks every domain you visit (the one cleartext metadata); routing via the VPS closes that leak, and TLS certs backstop any tampering on the VPS→resolver leg |
 
 ## At a glance
