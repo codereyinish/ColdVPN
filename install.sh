@@ -298,9 +298,11 @@ if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
     narrate "updating /etc/wireguard/wg0.conf on the server..."
     ssh $SSH_OPTS "$SSH_DEST" "sudo bash -s" <<REMOTE
 set -e
-cp /etc/wireguard/wg0.conf /etc/wireguard/wg0.conf.bak
-# keep the [Interface] section (everything before the first [Peer]), drop old peers
-awk '/^\[Peer\]/{exit} {print}' /etc/wireguard/wg0.conf.bak | grep -v '^[[:space:]]*\$' > /etc/wireguard/wg0.conf.new
+# keep the [Interface] section (everything before the first [Peer]), drop old
+# peers, then append this Mac as the single peer. Built in a .new file and moved
+# into place atomically — under set -e a failure aborts before the mv, so the
+# live wg0.conf is never left half-written (no .bak needed).
+awk '/^\[Peer\]/{exit} {print}' /etc/wireguard/wg0.conf | grep -v '^[[:space:]]*\$' > /etc/wireguard/wg0.conf.new
 printf '\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n' '$PUBLIC_KEY' '$PEER_ALLOWED' >> /etc/wireguard/wg0.conf.new
 mv /etc/wireguard/wg0.conf.new /etc/wireguard/wg0.conf
 chmod 600 /etc/wireguard/wg0.conf
