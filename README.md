@@ -10,6 +10,23 @@ your Mac → [WireGuard encrypted tunnel] → your server → internet
 A 🟢/🔴 menu-bar button turns the tunnel on and off. Nothing starts it
 automatically — after a reboot it's off until you switch it on.
 
+## What it hides (and what it doesn't)
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'}}}%%
+flowchart LR
+    Mac["your Mac"] -->|"carrier / Wi-Fi / MITM see only:<br/>encrypted packets to server:443"| Srv["your server (Oracle)"]
+    Srv -->|"exits as the server's IP —<br/>your real IP + location hidden"| Net["the site you visit"]
+```
+
+| who | what they learn |
+|---|---|
+| **your carrier / ISP / the Wi-Fi you're on** | only that you send **encrypted** packets to `your-server:443` — *not* the sites, *not* your DNS (it's tunnelled to 1.1.1.1), *not* the content |
+| **a man-in-the-middle** | nothing usable — WireGuard is encrypted **and** mutually authenticated, so they can't read or tamper without the keys |
+| **the site you visit** | your **server's** IP, not your real one — your home IP and location are hidden |
+
+**What it does *not* hide:** the site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
+
 ---
 
 ## Setup
@@ -52,8 +69,7 @@ curl ifconfig.me
 It should print your **server's IP** — not your home one. Click the menu-bar
 button to toggle the tunnel off and back on.
 
-**Curious what just happened?** See [How it works](#how-it-works) below — or the
-full step-by-step (what it keeps vs overrides) in the [developer guide](DEVELOPER.md).
+**Visualize the flow above →** [How setup works](#how-setup-works)
 
 > **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
 > *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.
@@ -61,7 +77,7 @@ full step-by-step (what it keeps vs overrides) in the [developer guide](DEVELOPE
 
 ---
 
-## How it works
+## How setup works
 
 Left to right: your one command to a live tunnel. Each numbered stage opens up
 into what happens inside it.
