@@ -52,6 +52,9 @@ curl ifconfig.me
 It should print your **server's IP** — not your home one. Click the menu-bar
 button to toggle the tunnel off and back on.
 
+**Curious what just happened?** See [How it works](#how-it-works) below — or the
+full step-by-step (what it keeps vs overrides) in the [developer guide](DEVELOPER.md).
+
 > **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
 > *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.
 > ([why](client/decisions/03-cli-vs-app.md))
