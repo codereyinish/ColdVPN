@@ -13,7 +13,22 @@ through the console. Why Terraform (and not a GUI agent or the raw `oci` CLI):
 
 1. **An Oracle Cloud account** (Always-Free is fine). Signup needs identity/card
    verification — there's no way around that.
-2. **Terraform**: `brew install terraform`
+2. **Terraform** — install the **prebuilt binary**:
+   ```bash
+   TFVER=$(curl -fsSL https://checkpoint-api.hashicorp.com/v1/check/terraform \
+     | sed -n 's/.*"current_version":"\([^"]*\)".*/\1/p')
+   ARCH=$([ "$(uname -m)" = "arm64" ] && echo arm64 || echo amd64)
+   curl -fsSLO "https://releases.hashicorp.com/terraform/$TFVER/terraform_${TFVER}_darwin_${ARCH}.zip"
+   unzip -o "terraform_${TFVER}_darwin_${ARCH}.zip" terraform
+   sudo mv terraform /usr/local/bin/        # Apple Silicon: mv terraform /opt/homebrew/bin/
+   terraform version
+   ```
+   > **Why not `brew install terraform`?** Homebrew dropped `terraform` from core
+   > (HashiCorp's BUSL license change), and HashiCorp's tap **builds it from
+   > source**, which needs current Xcode Command Line Tools — easy to be outdated.
+   > The prebuilt binary has **nothing to compile**, so it sidesteps both. (If your
+   > Command Line Tools are current, `brew install hashicorp/tap/terraform` also
+   > works.)
 3. **An API key** so Terraform can authenticate. Easiest:
    ```bash
    brew install oci-cli      # only needed for this one-time setup step
