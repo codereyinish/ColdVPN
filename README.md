@@ -71,10 +71,6 @@ button to toggle the tunnel off and back on.
 
 **Visualize the flow above →** [How setup works](#how-setup-works)
 
-> **Prefer no scripts?** Install **WireGuard** from the Mac App Store →
-> *Add Tunnel → Import from file* → pick your `wg0.conf`. Same tunnel, native app.
-> ([why](client/decisions/03-cli-vs-app.md))
-
 ---
 
 ## How setup works
