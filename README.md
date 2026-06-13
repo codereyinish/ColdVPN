@@ -38,6 +38,9 @@ Two things you do by hand — everything after is automatic.
 A free **Oracle Cloud** Ubuntu instance, with **UDP 443** open. One-time, in the
 cloud console. → [server/CREATE-VM.md](server/CREATE-VM.md)
 
+Prefer not to click through a console? Automate the whole box with **Terraform** →
+[server/provision](server/provision) ([why](client/decisions/08-provisioning-terraform.md)).
+
 ### 2 · Run the installer on your Mac
 
 ```bash

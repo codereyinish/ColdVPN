@@ -1,0 +1,7 @@
+# Terraform state can contain resource details (and is machine-specific); your
+# tfvars holds OCIDs + your SSH key. Keep both out of git.
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+crash.log
