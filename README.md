@@ -41,7 +41,7 @@ switch the tunnel on or off:
 
 | off | on |
 |:---:|:---:|
-| ![ColdVPN menu bar, disconnected](docs/menubar-off.png) | ![ColdVPN menu bar, connected via Oracle](docs/menubar-on.png) |
+| <img src="docs/menubar-off.png" alt="ColdVPN menu bar, disconnected" width="260"> | <img src="docs/menubar-on.png" alt="ColdVPN menu bar, connected via Oracle" width="260"> |
 
 ### Test it's working
 
