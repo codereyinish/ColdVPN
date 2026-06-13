@@ -1,16 +1,14 @@
 # ColdVPN
 
-An **always-on, self-hosted WireGuard VPN** for your Mac. Route *all* your
-traffic through a cloud server **you own** — instead of trusting a third-party
-VPN provider.
+A **self-hosted WireGuard VPN** for your Mac. Route *all* your traffic through a
+cloud server **you own** — instead of trusting a third-party VPN provider.
 
 ```
 your Mac → [WireGuard encrypted tunnel] → your server → internet
 ```
 
-It comes up by itself at boot on **any** network, and a 🟢/🔴 menu-bar button
-toggles it on/off. No carrier tricks, no bypass — just a clean VPN to a box you
-control.
+A 🟢/🔴 menu-bar button turns the tunnel on and off. Nothing starts it
+automatically — after a reboot it's off until you switch it on.
 
 ---
 
@@ -38,9 +36,12 @@ Partway through, it asks you for two things:
 
 Enter those — that's the last thing you do by hand.
 
-When it finishes, the **ColdVPN** button shows up in your menu bar:
+When it finishes, the **ColdVPN** button shows up in your menu bar — click it to
+switch the tunnel on or off:
 
-![ColdVPN menu-bar button](docs/menubar.png)
+| off | on |
+|:---:|:---:|
+| ![ColdVPN menu bar, disconnected](docs/menubar-off.png) | ![ColdVPN menu bar, connected via Oracle](docs/menubar-on.png) |
 
 ### Test it's working
 
@@ -84,7 +85,7 @@ flowchart LR
         end
         subgraph S4["④ finish on the Mac"]
             direction TB
-            d1["write wg0.conf"] --> d2["boot daemon + toggle + menu-bar"]
+            d1["write wg0.conf"] --> d2["toggle + menu-bar button"]
         end
     end
 

@@ -2,17 +2,16 @@
 # =============================================================================
 # install.sh — ColdVPN Installer (Mac)
 # =============================================================================
-# Sets up an always-on, self-hosted WireGuard VPN on your Mac. All Mac traffic
-# is routed through your own WireGuard server (e.g. Oracle Cloud free tier).
-# The tunnel comes up at boot on any network, and a menu-bar button lets you
-# toggle it on/off.
+# Sets up a manual, self-hosted WireGuard VPN on your Mac. All Mac traffic is
+# routed through your own WireGuard server (e.g. Oracle Cloud free tier) while
+# the tunnel is on. A menu-bar button toggles it on/off — and like an ordinary
+# VPN it is always OFF after a reboot (no boot service) until you turn it on.
 #
 # What it installs:
 #   - Homebrew (if missing)
 #   - wireguard-tools (via Homebrew)
 #   - SwiftBar (menu-bar app)
 #   - coldvpn-toggle.sh   → /usr/local/bin/   (on/off switch)
-#   - com.coldvpn.plist   → /Library/LaunchDaemons/  (brings tunnel up at boot)
 #   - wg0.conf                 → your WireGuard config dir
 #   - sudoers rule             → /etc/sudoers.d/coldvpn  (toggle without password)
 #   - coldvpn.5s.sh            → your SwiftBar plugins folder  (menu-bar button)
@@ -75,11 +74,12 @@ clear
 echo ""
 echo "${BLD}  ColdVPN — Installer${RST}"
 echo "  ────────────────────────────────────────"
-echo "  An always-on, self-hosted WireGuard VPN"
-echo "  for your Mac. Routes all traffic through"
-echo "  your own server, on any network."
+echo "  A self-hosted WireGuard VPN for your Mac."
+echo "  Routes all traffic through your own server."
+echo "  Toggle it from the menu bar; after a reboot"
+echo "  it's off until you turn it on."
 echo ""
-echo "  You'll need your server's IP and public key."
+echo "  You'll need your server's IP (and SSH access)."
 echo ""
 read -rp "  Press Enter to start..."
 
@@ -381,23 +381,19 @@ sudo chmod 755 "$TOGGLE"
 ok "coldvpn-toggle.sh → $TOGGLE"
 
 # =============================================================================
-# STEP 10 — Install the LaunchDaemon (brings the tunnel up at boot)
+# STEP 10 — Bring the tunnel up (manual — no boot service)
 # =============================================================================
-header "Step 10/13 — Installing the boot service"
+# ColdVPN is MANUAL, like an ordinary VPN: there is NO LaunchDaemon, so the
+# tunnel never starts by itself at boot. We bring it up once here so you can
+# verify it works; after a reboot it stays OFF until you turn it on from the
+# menu-bar button. (Step 1.5 already removed any old always-on boot daemon.)
+header "Step 10/13 — Starting the tunnel"
 
-PLIST=/Library/LaunchDaemons/com.coldvpn.plist
-sudo cp "$SCRIPT_DIR/com.coldvpn.plist" "$PLIST"
-sudo chown root:wheel "$PLIST"
-sudo chmod 644 "$PLIST"
+sudo "$WG_QUICK_BIN" down wg0 2>/dev/null || true   # clear any half-up state
+sudo "$WG_QUICK_BIN" up wg0
 
-# Reload-safe: bootstrap is a NO-OP if the label is already loaded, so on a
-# re-run an updated plist would never take effect. Unload any existing instance
-# first, then load fresh — this also cleanly re-ups the tunnel on a re-run.
-sudo launchctl bootout    system "$PLIST" 2>/dev/null || true
-sudo launchctl bootstrap  system "$PLIST" 2>/dev/null || true
-
-ok "Boot service installed and (re)loaded"
-info "Tunnel will come up automatically at boot"
+ok "Tunnel up"
+info "Won't start on its own — off after a reboot until you turn it on"
 
 # =============================================================================
 # STEP 11 — Configure sudoers (toggle without a password)
@@ -438,9 +434,8 @@ echo ""
 echo "  What you got:"
 echo "  • WireGuard config → $WG_CONF_DIR/wg0.conf"
 echo "  • Toggle script    → $TOGGLE"
-echo "  • Boot service     → $PLIST"
 echo "  • Menu-bar button  → $PLUGINS_DIR/coldvpn.5s.sh"
 echo ""
 echo "  The 🟢/🔴 ColdVPN button in your menu bar turns the VPN on/off."
-echo "  The tunnel also comes up by itself at boot."
+echo "  After a reboot it's off until you turn it on from the menu bar."
 echo ""

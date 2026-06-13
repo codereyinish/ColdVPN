@@ -16,7 +16,6 @@ ColdVPN/
 ├── client/
 │   ├── wg0.conf.example                ← Mac WireGuard config template
 │   ├── coldvpn-toggle.sh          ← on/off/toggle/status switch
-│   ├── com.coldvpn.plist          ← launchd daemon (RunAtLoad → tunnel up at boot)
 │   ├── coldvpn.5s.sh                   ← SwiftBar menu-bar on/off button
 │   ├── coldvpn-monitor                      ← dev widget: client + server health (optional)
 │   ├── coldvpn-monitor.swift                ← native menu-bar app for coldvpn-monitor (optional)
@@ -26,8 +25,9 @@ ColdVPN/
     └── wg0.conf.example                ← server WireGuard config template
 ```
 
-The tunnel is **always-on**: it comes up at boot on any network and is toggled
-on/off manually. There is no network detection and no hotspot logic.
+The tunnel is brought up and down by hand — a menu-bar button toggles it, and
+nothing starts it automatically, so after a reboot it's off until you turn it on.
+No boot service, no network detection, no hotspot logic.
 
 ---
 
@@ -137,15 +137,7 @@ sudo chmod 755 /usr/local/bin/coldvpn-toggle.sh
 ```
 Root-owned + not user-writable is what makes the passwordless sudoers rule safe.
 
-### Step 6 — Install the boot service (always-on)
-```bash
-sudo cp client/com.coldvpn.plist /Library/LaunchDaemons/
-sudo chown root:wheel /Library/LaunchDaemons/com.coldvpn.plist
-sudo launchctl bootstrap system /Library/LaunchDaemons/com.coldvpn.plist
-```
-`RunAtLoad` brings the tunnel up now and on every boot, on any network.
-
-### Step 7 — Configure sudoers (toggle without a password)
+### Step 6 — Configure sudoers (toggle without a password)
 The menu-bar button must run the toggle as root with no password prompt. This
 rule grants passwordless `sudo` for **only** that one script — safe *because* the
 script is root-owned and not user-writable (Step 5). `install.sh` writes this rule
@@ -156,14 +148,14 @@ echo "$(whoami) ALL=(root) NOPASSWD: /usr/local/bin/coldvpn-toggle.sh" \
 sudo chmod 440 /etc/sudoers.d/coldvpn
 ```
 
-### Step 8 — Install the menu-bar button
+### Step 7 — Install the menu-bar button
 ```bash
 brew install --cask swiftbar
 cp client/coldvpn.5s.sh ~/swiftbar-plugins/coldvpn.5s.sh
 chmod +x ~/swiftbar-plugins/coldvpn.5s.sh
 ```
 
-### Step 9 — Test
+### Step 8 — Test
 ```bash
 /usr/local/bin/coldvpn-toggle.sh on
 curl -s https://ifconfig.me      # should print your server's public IP
@@ -175,13 +167,10 @@ curl -s https://ifconfig.me      # should print your server's public IP
 ## How each piece works
 
 ### `client/coldvpn-toggle.sh`
-The one switch: `on` enables + bootstraps the daemon (and brings the tunnel up),
-`off` does `wg-quick down` + bootout + disable, `toggle` flips, `status` prints
-`on`/`off` (used by the menu-bar button). Runs as root via the scoped sudoers rule.
-
-### `client/com.coldvpn.plist`
-launchd daemon. `RunAtLoad` runs `wg-quick up wg0` once at boot, unconditionally,
-on any network. No watch script, no network check.
+The one switch: `on` brings the tunnel up (`wg-quick up`), `off` brings it down
+(`wg-quick down`), `toggle` flips, `status` prints `on`/`off` (used by the
+menu-bar button). No boot daemon — nothing starts it automatically. Runs as root
+via the scoped sudoers rule.
 
 ### `client/coldvpn.5s.sh`
 SwiftBar plugin (refreshes every 5s). Calls `coldvpn-toggle.sh status` and
