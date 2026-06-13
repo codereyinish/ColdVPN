@@ -27,7 +27,7 @@ ColdVPN/
 
 The tunnel is brought up and down by hand — a menu-bar button toggles it, and
 nothing starts it automatically, so after a reboot it's off until you turn it on.
-No boot service, no network detection, no hotspot logic.
+There is no boot service.
 
 ---
 
@@ -83,6 +83,45 @@ flowchart TB
 run · red = removed. The takeaway: a re-run **never re-keys an existing server**
 (skips `setup.sh`, and even a manual `setup.sh` reuses the saved key) — it only
 regenerates the *Mac's* keys and re-registers them as the server's single peer.
+
+## Do we need to reinstall every time?
+
+`install.sh` writes the **persistent** layer once (it survives reboots). The
+menu-bar **Turn ON** runs `wg-quick up`, which builds the **runtime** layer each
+time by *reading* that persistent config. A reboot — or **Turn OFF**
+(`wg-quick down`) — wipes only the runtime layer; nothing re-runs `install.sh`.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'},'flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+flowchart TB
+    INSTALL(["install.sh - run ONCE"]) ==>|"writes"| PERSIST
+    ON(["Turn ON - coldvpn-toggle.sh on -> wg-quick up"]) ==>|"writes"| RUNTIME
+    PERSIST -.->|"wg-quick up reads it"| RUNTIME
+    GONE(["reboot, or Turn OFF -> wg-quick down"]) ==>|"wipes"| RUNTIME
+
+    subgraph PERSIST["PERSISTENT - on disk, survives reboot"]
+        direction TB
+        p1["wg0.conf - Mac keys + server pubkey + endpoint + routes-to-use"]
+        p2["coldvpn-toggle.sh + sudoers rule"]
+        p3["SwiftBar plugin + brew packages"]
+        p4["server's peer entry (on the server)"]
+    end
+
+    subgraph RUNTIME["RUNTIME - in memory, GONE after reboot"]
+        direction TB
+        r1["utun interface (wireguard-go)"]
+        r2["routes: 0/1 + 128/1 + ::/0 + server pin-route"]
+        r3["DNS override -> 1.1.1.1"]
+        r4["live handshake with the server"]
+    end
+
+    style PERSIST stroke:#22c55e,color:#bbf7d0
+    style RUNTIME stroke:#f59e0b,color:#fde68a
+```
+
+So: green = written once by `install.sh`, stays. Amber = written by `wg-quick up`
+(Turn ON) every time, gone on reboot/Turn OFF — and rebuilt from the green layer
+the next time you turn it on. **No reinstall needed, ever.**
 
 The manual steps below are the same flow, one command per piece.
 
@@ -184,7 +223,6 @@ sudo nano /opt/homebrew/etc/wireguard/wg0.conf
 #   Endpoint   → your server IP:443
 #   Address    → 10.8.0.2/32
 ```
-No `PostUp` TTL/hop-limit lines — ColdVPN is a plain tunnel.
 
 ### Step 5 — Install the toggle script (root-owned)
 ```bash
