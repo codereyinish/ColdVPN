@@ -115,6 +115,61 @@ flowchart LR
 
 ---
 
+## The complete flow
+
+Every step of `./install.sh`, including what it **keeps** vs **overrides**, and
+the conditional `setup.sh` branch that runs on a fresh server.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'},'flowchart':{'nodeSpacing':38,'rankSpacing':42}}}%%
+flowchart TB
+    A(["./install.sh on the Mac"]) --> B["Step 1 — detect macOS + arch (Homebrew paths)"]
+    B --> C["Step 1.5 — CLEAR any previous install: boot out + remove old com.coldvpn / com.wireguardvpn daemon, toggle, sudoers"]
+    C --> D["Steps 2-4 — Homebrew · wireguard-tools · SwiftBar (install only if missing)"]
+    D --> E["Step 5 — generate this Mac's key pair"]
+    E --> F["Step 6 — you enter server IP + SSH user"]
+    F --> G["Step 7 — SSH into the server"]
+    G --> H{"wg0 already on the server?"}
+    H -->|"no - fresh box"| SETUP
+    H -->|"yes"| K["skip setup.sh - server kept as-is (never re-keyed)"]
+    SETUP --> I["read server pubkey + port + v4/v6 subnet"]
+    K --> I
+    I --> J["REPLACE server peer block with this Mac's key (backup .bak, keep interface section, dual-stack)"]
+    J --> L["Step 8 - write Mac wg0.conf (dual-stack, overwrites)"]
+    L --> M["Step 9 - install toggle to /usr/local/bin (root:wheel 755)"]
+    M --> P["Step 10 - wg-quick up (manual; NO boot daemon)"]
+    P --> N["Step 11 - sudoers rule (passwordless toggle)"]
+    N --> O["Step 12 - menu-bar button to SwiftBar plugins"]
+    O --> Q(["Step 13 - done · curl ifconfig.me = server IP"])
+
+    subgraph SETUP["setup.sh - on the server, only when fresh"]
+        direction TB
+        s1["apt install wireguard (skip if present)"] --> s2{"server key already exists?"}
+        s2 -->|"server.key / wg0.conf"| s3["REUSE existing key (no re-key)"]
+        s2 -->|"neither"| s4["generate NEW server key"]
+        s3 --> s5["write wg0.conf interface section only - dual-stack + NAT (no peer)"]
+        s4 --> s5
+        s5 --> s6["enable ip_forward + start wg-quick@wg0 (server stays always-on)"]
+    end
+
+    style C stroke:#ef4444,color:#fecaca
+    style D stroke:#22c55e,color:#bbf7d0
+    style E stroke:#f59e0b,color:#fde68a
+    style K stroke:#22c55e,color:#bbf7d0
+    style J stroke:#f59e0b,color:#fde68a
+    style L stroke:#f59e0b,color:#fde68a
+    style s3 stroke:#22c55e,color:#bbf7d0
+    style s4 stroke:#f59e0b,color:#fde68a
+    style SETUP stroke:#8b5cf6,color:#c4b5fd
+```
+
+**Colour key:** green = kept / reused · amber = regenerated or replaced every run
+· red = removed. Takeaway: a re-run **never re-keys an existing server** (it skips
+`setup.sh`, and even a manual `setup.sh` reuses the saved key) — it only
+regenerates the *Mac's* keys and re-registers them as the server's single peer.
+
+---
+
 ## Troubleshooting
 
 Connected but something's off? Check in this order:
