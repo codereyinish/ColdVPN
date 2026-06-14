@@ -1,5 +1,9 @@
-# Everything tenancy-specific lives here as variables — fill them in
-# terraform.tfvars (copy terraform.tfvars.example). Nothing secret is committed.
+# Tenancy-specific values. You normally DON'T touch these — `provision.sh` fills
+# compartment_ocid and ssh_public_key in automatically (as TF_VAR_* env vars,
+# read from ~/.oci/config and ~/.ssh) so there's nothing to paste. The optional
+# overrides further down can go in terraform.tfvars if you want them. Nothing
+# secret is committed. (Region isn't a variable: the provider reads it from your
+# ~/.oci/config profile.)
 
 variable "oci_profile" {
   description = "Profile name in ~/.oci/config to authenticate with"
@@ -7,18 +11,13 @@ variable "oci_profile" {
   default     = "DEFAULT"
 }
 
-variable "region" {
-  description = "OCI region, e.g. us-ashburn-1"
-  type        = string
-}
-
 variable "compartment_ocid" {
-  description = "OCID of the compartment to create resources in (root tenancy OCID is fine for a personal setup)"
+  description = "OCID of the compartment to create resources in (root tenancy OCID, auto-supplied by provision.sh from ~/.oci/config)"
   type        = string
 }
 
 variable "ssh_public_key" {
-  description = "Your SSH PUBLIC key text (contents of ~/.ssh/id_ed25519.pub) — added to the VM so you can log in"
+  description = "Your SSH PUBLIC key text (auto-supplied by provision.sh from ~/.ssh/id_ed25519.pub) — added to the VM so you can log in"
   type        = string
 }
 

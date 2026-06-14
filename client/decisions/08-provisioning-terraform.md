@@ -72,9 +72,11 @@ Terraform's  ──(OCI Go SDK)──────▶ HTTPS request ─┘     (S
    create it, `destroy` to remove it with no leftovers.
 
 ## Decision
-Automate provisioning with **Terraform** (`server/provision/`). The human still
-does the irreducible one-time bits — Oracle account signup + one API key — but
-after that, `terraform apply` builds VCN → subnet → gateway → ingress → VM, and
+Automate provisioning with **Terraform** (`server/provision/`). The human does
+only the irreducible bit — Oracle account signup. The API key is no longer hand-made
+either: `provision.sh` runs `oci setup bootstrap` (one browser login) to mint it,
+upload it, and write `~/.oci/config`, so there's nothing to paste. After that,
+`terraform apply` builds VCN → subnet → gateway → ingress → VM, and
 `terraform destroy` tears it down. The GUI-agent route is rejected (fragile, can't
 bot signup, worse than the API); raw `oci` CLI is rejected in favour of
 Terraform's declarative simplicity and state-tracked teardown.

@@ -1,9 +1,7 @@
-# Copy this to terraform.tfvars and fill in your values. (terraform.tfvars is
-# git-ignored — it holds your OCIDs and SSH key, which shouldn't be committed.)
-
-region           = "us-ashburn-1"                      # your OCI region
-compartment_ocid = "ocid1.tenancy.oc1..xxxxxxxxxxxx"   # tenancy OCID is fine for a personal setup
-ssh_public_key   = "ssh-ed25519 AAAA...your-key... you@mac"  # contents of ~/.ssh/id_ed25519.pub
+# You usually DON'T need this file. `provision.sh` supplies your credentials
+# (tenancy OCID + SSH key) and region automatically, so a normal run needs no
+# tfvars at all. Copy this to terraform.tfvars ONLY if you want to override one
+# of the optional settings below. (terraform.tfvars is git-ignored.)
 
 # ---- optional overrides (sensible defaults already set) ----
 # oci_profile        = "DEFAULT"             # profile in ~/.oci/config

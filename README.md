@@ -31,30 +31,38 @@ flowchart LR
 
 ## Setup
 
-Two things you do by hand — everything after is automatic.
+Create an Oracle account, then run one command — everything else is automatic.
 
-### 1 · Create the server VM
+### 1 · Create a free Oracle Cloud account
 
-A free **Oracle Cloud** Ubuntu instance, with **UDP 443** open. One-time, in the
-cloud console. → [server/CREATE-VM.md](server/CREATE-VM.md)
+The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS
+verification, so it can't be scripted.
 
-Prefer not to click through a console? Automate the whole box with **Terraform** →
-[server/provision](server/provision) ([why](client/decisions/08-provisioning-terraform.md)).
-
-### 2 · Run the installer on your Mac
+### 2 · Run it — one command builds the server *and* sets up your Mac
 
 ```bash
 git clone https://github.com/codereyinish/ColdVPN.git
-cd ColdVPN
-./install.sh
+cd ColdVPN/server/provision
+./provision.sh
 ```
 
-Partway through, it asks you for two things:
+`provision.sh` does the rest, with nothing to paste:
 
-- **Server public IP** — Oracle console → *Instances → your instance → Public IP address*
-- **SSH username** — `ubuntu` (Oracle's default image)
+- installs the **OCI CLI** + **Terraform** if they're missing
+- **one browser login** (`oci setup bootstrap`): you log in and click *Authorize*;
+  Oracle mints an API key, uploads its public half to your account, and writes
+  `~/.oci/config` — no OCIDs or keys typed
+- **Terraform** builds the VM + network, then **waits** until the server is ready
+  (it's still installing WireGuard in the background)
+- asks **"Configure this Mac now?"** → runs `install.sh` with the server IP handed
+  over automatically, so you never copy-paste it
 
-Enter those — that's the last thing you do by hand.
+→ how it works, step by step: [server/provision](server/provision)
+([why Terraform](client/decisions/08-provisioning-terraform.md)).
+
+**Prefer to do it by hand?** Create the VM in the console
+([server/CREATE-VM.md](server/CREATE-VM.md)), then run `./install.sh` from the repo
+root — it asks for the **server IP** and **SSH user** (`ubuntu`).
 
 When it finishes, the **ColdVPN** button shows up in your menu bar — click it to
 switch the tunnel on or off:

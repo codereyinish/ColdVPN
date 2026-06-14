@@ -67,6 +67,12 @@ DNS_SERVER="1.1.1.1"     # resolver the Mac uses inside the tunnel
 SERVER_PORT="443"        # WireGuard port — auto-read from the server in Step 7
 CLIENT_ADDR="10.8.0.2"   # this Mac's address inside the tunnel — auto-derived in Step 7
 
+# SERVER_IP / SSH_USER may be pre-set in the environment — provision.sh exports
+# them after it builds the server, so the chained run skips the Step 6 prompts.
+# Run install.sh on its own and they're empty, so it asks as usual.
+SERVER_IP="${SERVER_IP:-}"
+SSH_USER="${SSH_USER:-}"
+
 # =============================================================================
 # STEP 0 — Welcome
 # =============================================================================
@@ -204,15 +210,25 @@ echo "  ${DIM}             'Public IP address'  (or the line setup.sh printed at
 echo "  ${DIM}• SSH user  → 'ubuntu' on Oracle's Ubuntu image — just press Enter${RST}"
 echo ""
 
-# Reprompt until the IP is a valid IPv4 address.
-while :; do
-    ask SERVER_IP "Server IP address (e.g. 203.0.113.10)" ""
-    if [ -z "$SERVER_IP" ]; then info "Server IP can't be empty — try again."; continue; fi
-    if valid_ipv4 "$SERVER_IP"; then break; fi
-    info "'$SERVER_IP' isn't a valid IPv4 address (like 203.0.113.10) — try again."
-done
+# If provision.sh already handed us a valid IP, use it and skip the prompt;
+# otherwise reprompt until the IP is a valid IPv4 address.
+if valid_ipv4 "$SERVER_IP"; then
+    ok "Server IP provided: ${BLU}${SERVER_IP}${RST}"
+else
+    while :; do
+        ask SERVER_IP "Server IP address (e.g. 203.0.113.10)" ""
+        if [ -z "$SERVER_IP" ]; then info "Server IP can't be empty — try again."; continue; fi
+        if valid_ipv4 "$SERVER_IP"; then break; fi
+        info "'$SERVER_IP' isn't a valid IPv4 address (like 203.0.113.10) — try again."
+    done
+fi
 
-ask SSH_USER "SSH username on the server" "ubuntu"
+# Same for the SSH user: honour a pre-set value, else ask (default "ubuntu").
+if [ -n "$SSH_USER" ]; then
+    ok "SSH username: ${BLU}${SSH_USER}${RST}"
+else
+    ask SSH_USER "SSH username on the server" "ubuntu"
+fi
 
 ok "Server details collected"
 
