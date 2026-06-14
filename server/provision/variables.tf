@@ -23,9 +23,12 @@ variable "ssh_public_key" {
 }
 
 variable "instance_shape" {
-  description = "VM shape. Always-Free: VM.Standard.A1.Flex (Ampere ARM) or VM.Standard.E2.1.Micro (AMD)."
+  # E2.1.Micro (AMD, 1 OCPU/1GB) is the default because it's reliably available
+  # on Always-Free — plenty for WireGuard. A1.Flex (Ampere ARM, up to 4 OCPU/24GB)
+  # is more powerful but frequently fails apply with "Out of host capacity."
+  description = "VM shape. Always-Free: VM.Standard.E2.1.Micro (AMD, reliable) or VM.Standard.A1.Flex (Ampere, bigger but often no capacity)."
   type        = string
-  default     = "VM.Standard.A1.Flex"
+  default     = "VM.Standard.E2.1.Micro"
 }
 
 variable "instance_ocpus" {

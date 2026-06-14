@@ -212,14 +212,20 @@ ok "port ${LISTEN_PORT}, tunnel ${SERVER_ADDR} / ${SERVER_ADDR6}"
 # =============================================================================
 header "Step 7/10 — Creating server config"
 
-# PostUp/PostDown: NAT rules for BOTH IPv4 (iptables) and IPv6 (ip6tables).
-#   MASQUERADE — rewrites the source IP of VPN packets to the server's IP, so
-#   the internet sees the server, not the client's in-tunnel address.
-#   FORWARD — lets packets pass between wg0 and the internet interface.
-#   NOTE: use -I FORWARD 1 (insert at top), NOT -A (append). Oracle's Ubuntu
-#   image ships a default "FORWARD ... REJECT" rule; appending puts our ACCEPT
-#   below it, so it never matches and clients get no internet. Inserting at
-#   position 1 puts ACCEPT before the REJECT.
+# PostUp/PostDown: the OS firewall rules a NAT gateway needs (IPv4 + IPv6).
+# Oracle's Ubuntu image ships a restrictive default firewall — BOTH the INPUT and
+# FORWARD chains end in "REJECT ... icmp-host-prohibited". So we open three things,
+# inserting with -I ... 1 (at the TOP), NOT -A (append), so each ACCEPT sits
+# ABOVE those REJECTs:
+#   1. INPUT, udp dport = listen port — accept WireGuard's own port, or the
+#      handshake is REJECTed before WireGuard ever sees it. (The cloud Security
+#      List opening 443 is NOT enough — the OS firewall blocks it too.)
+#   2. FORWARD -i wg0            — client → internet.
+#   3. FORWARD -o wg0 ESTABLISHED,RELATED — the RETURN traffic back to clients;
+#      without it, replies hit the REJECT and clients get no internet.
+#   + MASQUERADE — rewrite the source IP so the internet sees the server.
+# (Both #1 and #3 were found missing during a fresh-server test — they're required
+#  on a stock Oracle image; without them the tunnel handshakes but passes nothing.)
 #
 # No [Peer] block — install.sh on the Mac adds the client peer over SSH.
 cat > /etc/wireguard/wg0.conf << EOF
@@ -227,8 +233,8 @@ cat > /etc/wireguard/wg0.conf << EOF
 PrivateKey = ${SERVER_PRIVATE_KEY}
 Address = ${SERVER_ADDR}/24, ${SERVER_ADDR6}/64
 ListenPort = ${LISTEN_PORT}
-PostUp   = iptables -I FORWARD 1 -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE; ip6tables -I FORWARD 1 -i wg0 -j ACCEPT; ip6tables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE
-PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ${NET_IF} -j MASQUERADE; ip6tables -D FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${NET_IF} -j MASQUERADE
+PostUp   = iptables -I INPUT 1 -p udp --dport ${LISTEN_PORT} -j ACCEPT; iptables -I FORWARD 1 -i wg0 -j ACCEPT; iptables -I FORWARD 1 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE; ip6tables -I FORWARD 1 -i wg0 -j ACCEPT; ip6tables -I FORWARD 1 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT; ip6tables -t nat -A POSTROUTING -o ${NET_IF} -j MASQUERADE
+PostDown = iptables -D INPUT -p udp --dport ${LISTEN_PORT} -j ACCEPT; iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -o ${NET_IF} -j MASQUERADE; ip6tables -D FORWARD -i wg0 -j ACCEPT; ip6tables -D FORWARD -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${NET_IF} -j MASQUERADE
 EOF
 
 chmod 600 /etc/wireguard/wg0.conf
