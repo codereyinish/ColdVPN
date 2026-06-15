@@ -38,6 +38,18 @@ Create an Oracle account, then run one command — everything else is automatic.
 
 The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS.
 
+What you'll go through:
+
+1. Email + country + name → verify your email
+2. Set a password + an account name
+3. **Choose a Home Region** — pick one near you. It's **permanent** on a free account,
+   and your server must live in it, so remember which you pick.
+4. Phone / SMS code
+5. Credit card (identity check only — Always-Free doesn't charge you)
+6. Accept → the account provisions in a few minutes, then the console loads
+
+You'll re-enter that **Home Region** when `provision.sh` asks for a region in step 2.
+
 ### 2 · Run it — one command builds the server *and* sets up your Mac
 
 ```bash
