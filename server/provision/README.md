@@ -55,33 +55,42 @@ terraform init && terraform plan && terraform apply
 
 ## Under the hood — from credentials to a running server
 
-A browser login mints a key, Oracle stores its public half, and Terraform uses the
-private half to sign every API call that builds your server. The private key is the
-crown jewel — its safety branch is on the right.
+**Two credentials, used in sequence.** A short-lived **session token** (earned by
+your browser login) is used *once* to set up a permanent **API key** (a key pair);
+the API key then signs everything Terraform does. The token solves a chicken-and-egg:
+you can't use the API key until Oracle has registered it, and registering needs you
+authenticated — so the login mints a one-time token to bridge the gap, then retires.
+
+The API key's life in one line:
+
+```
+2a CREATED (on your Mac) → 2c REGISTERED (public half uploaded) → 3 USED (signs every call)
+```
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'},'flowchart':{'nodeSpacing':40,'rankSpacing':45}}}%%
 flowchart TB
-    A(["oci setup bootstrap (one browser login)"]) --> B["Oracle authenticates you in the browser<br/>identifies WHO · WHICH account · WHERE — no pasting"]
-    B --> C["mints a key pair + writes ~/.oci/config<br/>(user + tenancy OCID, region, fingerprint, key path)"]
-    C --> D["uploads the PUBLIC key to your user automatically<br/>Oracle stores it, labelled by its fingerprint"]
-    D --> E(["terraform apply"])
-    E --> F["reads ~/.oci/config (credentials) + *.tf (desired infra)"]
-    F --> G["plan: desired vs state (empty on first run)<br/>→ 'will create VCN, subnet, gateway, VM'"]
-    G --> PERCALL
+    subgraph BOOT["oci setup bootstrap — set up the credential (one browser login)"]
+        direction TB
+        A["2a · CREATE the API key = a key pair, on your Mac<br/>private → ~/.oci/*.pem (never leaves) · public → held for now"]
+        A --> B["2b · browser login: you type username + password + MFA<br/>(the key plays NO part here) → Oracle returns a SESSION TOKEN"]
+        B --> C["2c · CLI calls Oracle, authenticated by the TOKEN:<br/>① read user + tenancy OCID + region<br/>② REGISTER (upload) the PUBLIC key on your user"]
+        C --> D["2d · write ~/.oci/config (OCIDs · region · fingerprint · key path)<br/>API key now USABLE — session token expires & retires"]
+    end
 
-    subgraph PERCALL["for every API call (signed + verified)"]
+    D --> E(["terraform apply"])
+
+    subgraph PERCALL["for every API call — now authenticated by the API KEY"]
         direction TB
         p1["build the request (e.g. create VCN)"] --> p2["SIGN with the PRIVATE key<br/>+ attach fingerprint + user OCID"]
         p2 --> p3["HTTPS → region endpoint (real Oracle, via TLS cert)"]
         p3 --> p4["Oracle: fingerprint → finds your PUBLIC key<br/>→ verifies signature → checks permissions"]
         p4 --> p5["CREATE → returns new OCID / public IP"]
-        p5 --> p6["record in terraform.tfstate"]
     end
-
+    E --> PERCALL
     PERCALL --> Z(["server built → public IP printed → run install.sh"])
 
-    C -.->|"the secret half"| SEC
+    A -.->|"the secret half"| SEC
     subgraph SEC["PRIVATE key — how it's kept safe"]
         direction TB
         s1["~/.oci/*.pem · chmod 600 (only your user)"]
@@ -91,14 +100,17 @@ flowchart TB
         s5["leaked? delete the key in the console → revoked instantly"]
     end
 
+    style BOOT stroke:#3b82f6,color:#bfdbfe
     style PERCALL stroke:#8b5cf6,color:#c4b5fd
     style SEC stroke:#ef4444,color:#fecaca
 ```
 
-Key idea: the bootstrapped config says *who/which/where*, the key pair *proves it's
-you* (private signs, public verifies, fingerprint picks the right key), and HTTPS
-*proves you're talking to real Oracle*. Together that's what lets `terraform apply`
-build your server safely on every call.
+Key idea: the **session token** (from your login) proves it's you *once*, just long
+enough to register the key and read your IDs. After that the **API key pair** does
+all the work — the private half *signs* each request, Oracle *verifies* with the
+registered public half (the fingerprint tells it which key to check), and HTTPS
+proves you're talking to real Oracle. That's what lets `terraform apply` build your
+server safely on every call, unattended, with no further login.
 
 ## Tear it down
 

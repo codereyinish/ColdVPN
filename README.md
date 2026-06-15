@@ -50,8 +50,8 @@ cd ColdVPN/server/provision
 
 - installs the **OCI CLI** + **Terraform** if they're missing
 - **one browser login** (`oci setup bootstrap`): you log in and click *Authorize*;
-  Oracle mints an API key, uploads its public half to your account, and writes
-  `~/.oci/config` — no OCIDs or keys typed
+  it generates an API key (a key pair) on your Mac, registers the **public** half
+  on your account, and fills in `~/.oci/config` — no OCIDs or keys typed
 - **Terraform** builds the VM + network, then **waits** until the server is ready
   (it's still installing WireGuard in the background)
 - asks **"Configure this Mac now?"** → runs `install.sh` with the server IP handed

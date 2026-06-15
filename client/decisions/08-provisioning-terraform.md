@@ -74,8 +74,9 @@ Terraform's  ──(OCI Go SDK)──────▶ HTTPS request ─┘     (S
 ## Decision
 Automate provisioning with **Terraform** (`server/provision/`). The human does
 only the irreducible bit — Oracle account signup. The API key is no longer hand-made
-either: `provision.sh` runs `oci setup bootstrap` (one browser login) to mint it,
-upload it, and write `~/.oci/config`, so there's nothing to paste. After that,
+either: `provision.sh` runs `oci setup bootstrap` (one browser login), which
+generates the key pair locally, registers its public half on your user, and writes
+`~/.oci/config`, so there's nothing to paste. After that,
 `terraform apply` builds VCN → subnet → gateway → ingress → VM, and
 `terraform destroy` tears it down. The GUI-agent route is rejected (fragile, can't
 bot signup, worse than the API); raw `oci` CLI is rejected in favour of
