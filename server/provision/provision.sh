@@ -20,7 +20,7 @@
 # =============================================================================
 set -e
 
-RED=$'\033[91m'; GRN=$'\033[92m'; YLW=$'\033[93m'; BLU=$'\033[96m'; BLD=$'\033[1m'; RST=$'\033[0m'
+RED=$'\033[91m'; GRN=$'\033[92m'; YLW=$'\033[93m'; BLU=$'\033[96m'; BLD=$'\033[1m'; DIM=$'\033[90m'; RST=$'\033[0m'
 header() { echo ""; echo "${BLD}${BLU}── $1 ${RST}"; }
 ok()   { echo "  ${GRN}✓${RST} $1"; }
 info() { echo "  ${YLW}→${RST} $1"; }
@@ -64,12 +64,30 @@ else
 fi
 
 # --- 3. Oracle credentials (browser login, once) ------------------------------
-header "Oracle credentials"
+header "Oracle credentials — one-time browser login"
 if [ -f "$OCI_CONFIG" ] && grep -q "^\[$PROFILE\]" "$OCI_CONFIG"; then
     ok "~/.oci/config already has profile [$PROFILE] — skipping login"
 else
-    info "logging you into Oracle in the browser. This generates + uploads an API"
-    info "key and writes ~/.oci/config — approve the request in the browser tab."
+    # The next command (oci setup bootstrap) fires 4 interactive prompts in a row.
+    # Spell them out FIRST so they don't catch the user off guard, then pause so
+    # they can read before the prompts start scrolling.
+    echo ""
+    echo "  ${BLD}You'll be asked 4 quick things — here's what to do:${RST}"
+    echo ""
+    echo "  ${BLU}1.${RST} ${BLD}Region${RST}  — type the number of your ${BLD}Home Region${RST} (the one you"
+    echo "         picked at signup).  ${DIM}e.g.  72  for us-ashburn-1${RST}"
+    echo ""
+    echo "  ${BLU}2.${RST} ${BLD}macOS popup${RST}  \"Allow 'Python' to find devices on local networks?\""
+    echo "         → click ${GRN}Allow${RST}.  ${YLW}⚠ Don't click \"Don't Allow\" — your browser login${RST}"
+    echo "         ${YLW}can't get back to the tool and the whole thing hangs / aborts.${RST}"
+    echo ""
+    echo "  ${BLU}3.${RST} ${BLD}Browser opens${RST}  → log into Oracle → click ${GRN}Authorize${RST}."
+    echo ""
+    echo "  ${BLU}4.${RST} ${BLD}Passphrase${RST} prompt  → type ${GRN}N/A${RST}  (no passphrase, so this can run"
+    echo "         later without asking you to unlock the key)."
+    echo ""
+    read -rp "  Press Enter to start the login... "
+    echo ""
     oci setup bootstrap --profile-name "$PROFILE"
     [ -f "$OCI_CONFIG" ] || die "bootstrap finished but ~/.oci/config wasn't written."
     ok "credentials configured"

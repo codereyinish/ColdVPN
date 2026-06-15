@@ -69,6 +69,11 @@ cd ColdVPN/server/provision
 - asks **"Configure this Mac now?"** → runs `install.sh` with the server IP handed
   over automatically, so you never copy-paste it
 
+During the login the script walks you through four one-time prompts: pick your
+**Home Region**, click **Allow** on the macOS *"Allow Python…"* popup (don't skip it
+— the login needs it), **log in + Authorize** in the browser, and type **`N/A`** at
+the passphrase prompt. After that it's hands-off.
+
 → how it works, step by step: [server/provision](server/provision)
 ([why Terraform](client/decisions/08-provisioning-terraform.md)).
 
