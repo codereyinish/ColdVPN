@@ -36,8 +36,7 @@ Create an Oracle account, then run one command — everything else is automatic.
 
 ### 1 · Create a free Oracle Cloud account
 
-The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS
-verification, so it can't be scripted.
+The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS.
 
 ### 2 · Run it — one command builds the server *and* sets up your Mac
 
