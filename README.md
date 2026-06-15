@@ -10,7 +10,7 @@ your Mac → [WireGuard encrypted tunnel] → your server → internet
 Everything's local and yours: your own app (SwiftBar), your own free server
 (Oracle Always-Free), and easy to install — just log in once to create the server.
 
-## What it hides (and what it doesn't)
+## What it hides
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'}}}%%
@@ -27,8 +27,6 @@ flowchart LR
   can't read or tamper with it — only your Mac and your server hold the keys.
 - **The site you visit** sees your server's IP, not your real one — your home IP and
   location stay hidden.
-
-**What it does *not* hide:** the site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
 
 ---
 
@@ -141,6 +139,12 @@ flowchart LR
 **Go deeper:** ① [Mac client build](client/ARCHITECTURE.md) + [why not the WireGuard app](client/decisions/03-cli-vs-app.md) · ② [setup.sh](server/setup.sh) + [how the VM is made](server/CREATE-VM.md) · ③ [why SSH is automated](client/decisions/06-automate-key-handoff-over-ssh.md) + [SSH trust & flaws](client/decisions/05-ssh-trust-model.md) · ④ [client build](client/ARCHITECTURE.md)
 
 **Once it's running:** 📦 [how a packet actually flows](client/PACKET-FLOW.md) (Mac → carrier → Oracle, the two NATs, and back) · 🏗️ [the Oracle network you create](server/CREATE-VM.md) (VCN → subnet → ingress → VM)
+
+---
+
+## Limitations
+
+**What it does *not* hide:** the site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
 
 ---
 
