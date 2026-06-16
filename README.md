@@ -42,19 +42,22 @@ Create an Oracle account, then run one command — everything else is automatic.
 
 ### 1 · Create a free Oracle Cloud account
 
-The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS.
+The only manual step: <https://signup.cloud.oracle.com>. Signup needs card + SMS, and
+asks you to **choose a Home Region** — pick one near you. It's **permanent** on a free
+account and your server lives in it, so remember which you pick (you'll re-enter it when
+`provision.sh` asks).
 
-What you'll go through:
+<details>
+<summary>The full signup walkthrough</summary>
 
 1. Email + country + name → verify your email
 2. Set a password + an account name
-3. **Choose a Home Region** — pick one near you. It's **permanent** on a free account,
-   and your server must live in it, so remember which you pick.
+3. **Choose a Home Region** — permanent on a free account; your server must live in it
 4. Phone / SMS code
 5. Credit card (identity check only — Always-Free doesn't charge you)
 6. Accept → the account provisions in a few minutes, then the console loads
 
-You'll re-enter that **Home Region** when `provision.sh` asks for a region in step 2.
+</details>
 
 ### 2 · Run it — one command builds the server *and* sets up your Mac
 
@@ -64,24 +67,14 @@ cd ColdVPN/server/provision
 ./provision.sh
 ```
 
-`provision.sh` does the rest, with nothing to paste:
-
-- installs the **OCI CLI** + **Terraform** if they're missing
-- **one browser login** (`oci setup bootstrap`): you log in and click *Authorize*;
-  it generates an API key (a key pair) on your Mac, registers the **public** half
-  on your account, and fills in `~/.oci/config` — no OCIDs or keys typed
-- **Terraform** builds the VM + network, then **waits** until the server is ready
-  (it's still installing WireGuard in the background)
-- asks **"Configure this Mac now?"** → runs `install.sh` with the server IP handed
-  over automatically, so you never copy-paste it
+`provision.sh` does the rest automatically — one browser login, nothing to paste.
+What it does and how: [server/provision](server/provision)
+([why Terraform](client/decisions/08-provisioning-terraform.md)).
 
 During the login the script walks you through four one-time prompts: pick your
 **Home Region**, click **Allow** on the macOS *"Allow Python…"* popup (don't skip it
 — the login needs it), **log in + Authorize** in the browser, and type **`N/A`** at
 the passphrase prompt. After that it's hands-off.
-
-→ how it works, step by step: [server/provision](server/provision)
-([why Terraform](client/decisions/08-provisioning-terraform.md)).
 
 **Prefer to do it by hand?** Create the VM in the console
 ([server/CREATE-VM.md](server/CREATE-VM.md)), then run `./install.sh` from the repo
