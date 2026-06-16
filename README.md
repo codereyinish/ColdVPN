@@ -21,26 +21,17 @@ flowchart LR
     Net -.->|"sees your server,<br/>not your real location"| Srv
 ```
 
-You're at a café, on airport Wi-Fi, or on someone's hotspot, and you open your bank's
-website. On public Wi-Fi like that, someone else on the same network can potentially
-see what you're doing.
+On café, airport, or hotspot Wi-Fi, anyone on the same network can see which sites
+you're connecting to. Turn ColdVPN on and all your traffic — even the lookups that find
+each site — runs through one locked tunnel to your own server. Now they see only
+"connected to my server": not that you opened your bank, and they can't redirect or
+block you along the way.
 
-With ColdVPN on, everything first goes through a private tunnel to your own server. So
-even if someone on that Wi-Fi intercepts your traffic, all they see is that you're
-connected to your server — they can't even tell you went to your bank.
+Your bank, in turn, sees your server's address — not your real IP or location. (Your
+password was already safe; bank sites are encrypted. What ColdVPN adds is hiding *which*
+sites you visit, and from where.)
 
-(Your login itself was already safe — banking sites are encrypted, so no one on the
-Wi-Fi could read your password or balance anyway. What ColdVPN adds is hiding *which*
-sites you visit in the first place.)
-
-Same goes for the lookups your device makes to find a site ("where is my bank?") — they
-run through the tunnel and are answered by your own server, not the Wi-Fi you're on. So
-the network can't watch them, send you to a fake site, or block them.
-
-And your bank only sees your server's address, not yours — so your real location stays
-hidden.
-
-This isn't everything a commercial VPN does — for what ColdVPN deliberately *doesn't*
+That's the core of it — not a full commercial VPN. For what it deliberately *doesn't*
 do, see [Limitations](#limitations) below.
 
 ---
