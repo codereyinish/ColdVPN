@@ -159,11 +159,33 @@ flowchart LR
 
 ## Limitations
 
-**What it does *not* hide:** the site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
+<details>
+<summary><b>It hides your location, not your identity.</b> Logins and cookies still know it's you.</summary>
 
-**One location, fixed at signup.** You exit through the single Oracle region you chose when creating the account — and that region is **permanent** on the free tier. You can't switch countries on the fly. To appear somewhere else you'd create a second Oracle account, stand up a server in that region, and run the setup again.
+The site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
 
-**It's not an ad blocker.** A VPN changes your address, not what loads on a page — so ColdVPN doesn't stop cross-site tracking on its own *(a Pi-hole option on the server, to block known tracker domains, is planned)*. And it **can't block YouTube ads at all**: YouTube serves its ads from the **same domains as the videos themselves**, so there's no ad domain to block — cut it and you cut the video too. Killing YouTube ads needs browser/app-level tools (uBlock Origin, ReVanced), not a VPN.
+</details>
+
+<details>
+<summary><b>One location, fixed at signup.</b> Free multi-country isn't really possible.</summary>
+
+You exit through the single Oracle region you chose when creating the account, and that region is **permanent** on the free tier — you can't switch countries on the fly. The deeper reason: no free tier gives you a choice of countries. **Oracle** allows only one region per account, **Google Cloud**'s free VM is US-only, and **AWS / Fly.io** no longer offer a free server at all. So real location-switching means paying for a small VPS (e.g. Hetzner ~$4/mo) in each country — which leaves the free lane entirely.
+
+</details>
+
+<details>
+<summary><b>You trade "trust a VPN company" for "trust a VPS host."</b> Better, not perfect.</summary>
+
+Self-hosting means no VPN provider is logging or selling your activity, and the keys are yours. But the machine your traffic exits from is still someone else's hardware (Oracle, Hetzner, whoever), and that host *can* technically see the traffic leaving it. It's a better trust model than a commercial VPN — not a perfect one.
+
+</details>
+
+<details>
+<summary><b>It's not an ad blocker.</b> No tracking protection yet, and it can't block YouTube ads.</summary>
+
+A VPN changes your address, not what loads on a page — so ColdVPN doesn't stop cross-site tracking on its own *(a Pi-hole option on the server, to block known tracker domains, is planned)*. And it **can't block YouTube ads at all**: YouTube serves its ads from the **same domains as the videos themselves**, so there's no ad domain to block — cut it and you cut the video too. Killing YouTube ads needs browser/app-level tools (uBlock Origin, ReVanced), not a VPN.
+
+</details>
 
 ---
 
