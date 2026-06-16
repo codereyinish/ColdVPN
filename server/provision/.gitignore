@@ -5,3 +5,4 @@
 *.tfstate.*
 terraform.tfvars
 crash.log
+provision.log

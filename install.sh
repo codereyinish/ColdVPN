@@ -268,12 +268,18 @@ if ssh $SSH_OPTS "$SSH_DEST" 'true'; then
     # Fresh server? Bootstrap WireGuard over this same SSH connection — but ONLY
     # if it isn't set up yet. An existing wg0 is left untouched (never re-keyed),
     # so running this against a live server is safe.
+    #
+    # We PUSH our local server/setup.sh into `sudo bash -s` over the SSH we already
+    # have — the server never downloads anything. No GitHub, no boot-time DNS race,
+    # and it runs the exact setup.sh from the repo you cloned (not whatever's on main).
     if ssh $SSH_OPTS "$SSH_DEST" 'sudo wg show wg0' >/dev/null 2>&1; then
         ok "server already set up — keeping its key (skipping setup.sh); its peer is updated below"
     else
-        narrate "fresh server — installing WireGuard (one-time setup.sh over SSH)..."
-        ssh $SSH_OPTS "$SSH_DEST" 'curl -fsSL https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh | sudo bash'
-        ok "server WireGuard installed"
+        narrate "fresh server — installing WireGuard (pushing setup.sh over SSH)..."
+        SETUP_SH="$(cd "$(dirname "$0")" && pwd)/server/setup.sh"
+        [ -f "$SETUP_SH" ] || die "Can't find server/setup.sh next to install.sh (looked in $SETUP_SH)."
+        ssh $SSH_OPTS "$SSH_DEST" 'sudo bash -s' < "$SETUP_SH"
+        ok "server WireGuard installed (from your local setup.sh — nothing downloaded)"
     fi
 
     narrate "reading the server's identity (its public key)..."

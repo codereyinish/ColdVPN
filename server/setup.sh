@@ -66,8 +66,35 @@ info() {
 die() {
     echo ""
     echo "  ${RED}✗ Error: $1${RST}"
+    [ -n "$LOG" ] && [ -s "$LOG" ] && { echo "  ${RED}last log lines:${RST}"; tail -n 15 "$LOG" | sed 's/^/    /'; }
     echo ""
     exit 1
+}
+
+# Verbose command output (apt, systemctl) streams here instead of the screen, so
+# the run stays clean. Runs as root, so /var/log is writable.
+LOG=/var/log/coldvpn-setup.log
+: > "$LOG" 2>/dev/null || { LOG=/tmp/coldvpn-setup.log; : > "$LOG"; }
+
+# step N "msg" — a clean header line with a #### progress bar (N of 10). Printed
+# fresh each step (no in-place cursor tricks — safe when piped over SSH).
+step() {
+    local n=$1 msg=$2 total=10 width=22 pct filled i bar=""
+    pct=$(( n * 100 / total ))
+    filled=$(( pct * width / 100 ))
+    for ((i = 0; i < width; i++)); do
+        if (( i < filled )); then bar+="#"; else bar+="·"; fi
+    done
+    echo ""
+    echo "  ${BLD}[${bar}] ${pct}%${RST}  ${BLU}${msg}${RST}"
+}
+
+# run "label" cmd... — run a noisy command with its output sent to $LOG; on
+# failure, surface it (die shows the log tail).
+run() {
+    local label=$1; shift
+    info "$label"
+    "$@" >> "$LOG" 2>&1 || die "$label — failed (see $LOG)"
 }
 
 ask() {
@@ -101,7 +128,7 @@ echo "   run it by hand.)"
 # =============================================================================
 # STEP 1 — Check this is Linux and running as root
 # =============================================================================
-header "Step 1/10 — Checking system"
+step 1 "Checking system"
 
 if [ "$(uname)" != "Linux" ]; then
     die "This script must run on Linux (Ubuntu). Run it on your VPS, not your Mac."
@@ -125,23 +152,32 @@ ok "Ubuntu $UBUNTU_VERSION detected"
 # =============================================================================
 # STEP 2 — Update packages and install WireGuard
 # =============================================================================
-header "Step 2/10 — Installing WireGuard"
+step 2 "Installing WireGuard"
 
 # noninteractive so apt never stops for a dialog when run unattended over SSH
 export DEBIAN_FRONTEND=noninteractive
 
-info "Updating package list..."
-apt update -qq
+# A freshly-booted cloud VM brings up sshd BEFORE its DNS resolver is ready, so if
+# we run apt immediately it fails with "Temporary failure resolving archive.ubuntu.com"
+# and can't find the package. Wait until the mirror actually resolves (up to ~3 min)
+# before touching apt.
+info "Waiting for network/DNS to come up..."
+n=0
+until getent hosts archive.ubuntu.com >/dev/null 2>&1; do
+    n=$((n + 1))
+    [ "$n" -ge 36 ] && die "network/DNS never came up (can't resolve archive.ubuntu.com after 3 min)."
+    sleep 5
+done
+ok "network is up"
 
-info "Installing wireguard..."
-apt install -y wireguard wireguard-tools iptables
-
+run "Updating package list..." apt update -qq
+run "Installing wireguard..." apt install -y wireguard wireguard-tools iptables
 ok "WireGuard installed"
 
 # =============================================================================
 # STEP 3 — Generate server key pair
 # =============================================================================
-header "Step 3/10 — Generating server keys"
+step 3 "Generating server keys"
 
 # The server private key is the ANCHOR: if it ever changes, every client's
 # [Peer] goes stale and the handshake breaks. So reuse an existing key, and only
@@ -167,7 +203,7 @@ info "Private key stays on this server — never share it"
 # =============================================================================
 # STEP 4 — Detect network interface
 # =============================================================================
-header "Step 4/10 — Detecting network interface"
+step 4 "Detecting network interface"
 
 # Auto-detect the main outbound network interface
 # On Oracle Cloud this is usually ens3 or enp0s3 (not eth0)
@@ -183,7 +219,7 @@ ok "Network interface: $NET_IF"
 # =============================================================================
 # STEP 5 — Enable IP forwarding
 # =============================================================================
-header "Step 5/10 — Enabling IP forwarding"
+step 5 "Enabling IP forwarding"
 
 # IP forwarding allows the server to route packets from VPN clients
 # to the internet — without this, clients can connect but can't browse
@@ -196,7 +232,7 @@ ok "IPv4 and IPv6 forwarding enabled"
 # =============================================================================
 # STEP 6 — Collect config from user
 # =============================================================================
-header "Step 6/10 — Server configuration"
+step 6 "Server configuration"
 
 # Non-interactive: fixed defaults, no prompts. The Mac client peer is NOT added
 # here — the Mac's install.sh registers it over SSH after this runs. So wg0 is
@@ -210,7 +246,7 @@ ok "port ${LISTEN_PORT}, tunnel ${SERVER_ADDR} / ${SERVER_ADDR6}"
 # =============================================================================
 # STEP 7 — Create /etc/wireguard/wg0.conf
 # =============================================================================
-header "Step 7/10 — Creating server config"
+step 7 "Creating server config"
 
 # PostUp/PostDown: the OS firewall rules a NAT gateway needs (IPv4 + IPv6).
 # Oracle's Ubuntu image ships a restrictive default firewall — BOTH the INPUT and
@@ -243,15 +279,14 @@ ok "Server config created at /etc/wireguard/wg0.conf"
 # =============================================================================
 # STEP 8 — Enable and start WireGuard
 # =============================================================================
-header "Step 8/10 — Starting WireGuard"
+step 8 "Starting WireGuard"
 
 # Enable: auto-starts on every reboot
 # Start: brings the tunnel up right now
-systemctl enable wg-quick@wg0
-systemctl start  wg-quick@wg0
+run "Enabling WireGuard service (auto-start on reboot)..." systemctl enable wg-quick@wg0
+run "Starting WireGuard..." systemctl start wg-quick@wg0
 
-ok "WireGuard service started"
-ok "Auto-starts on reboot"
+ok "WireGuard service started + enabled"
 
 # Verify it's running
 if systemctl is-active --quiet wg-quick@wg0; then
@@ -263,7 +298,7 @@ fi
 # =============================================================================
 # STEP 9 — Open firewall (if ufw is active)
 # =============================================================================
-header "Step 9/10 — Firewall"
+step 9 "Firewall"
 
 if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
     ufw allow "$LISTEN_PORT"/udp
@@ -286,7 +321,7 @@ echo "  Protocol: UDP  |  Port: $LISTEN_PORT"
 # =============================================================================
 # STEP 10 — Done — show server public key
 # =============================================================================
-header "Step 10/10 — Setup complete"
+step 10 "Setup complete"
 
 echo ""
 echo "${GRN}${BLD}  ✓ Server setup complete!${RST}"

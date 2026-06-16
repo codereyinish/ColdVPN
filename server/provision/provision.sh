@@ -26,9 +26,54 @@ ok()   { echo "  ${GRN}✓${RST} $1"; }
 info() { echo "  ${YLW}→${RST} $1"; }
 die()  { echo ""; echo "  ${RED}✗ $1${RST}"; echo ""; exit 1; }
 
+# progress BAR — redraws ONE line in place: [####······]  42%  message
+# Verbose Terraform/poll output goes to $LOG instead of the screen; this bar is
+# the only thing the user watches during the hands-off phases.
+progress() {
+    local pct=$1 msg=$2 cols filled i bar="" barw reserved=8 pad
+    [ "$pct" -gt 100 ] && pct=100
+    cols=${COLUMNS:-80}   # real width, measured once up front (see export below)
+    barw=$(( cols - reserved ))   # bar fills the window; "] NNN%" sits at the edge
+    (( barw < 10 )) && barw=10
+    filled=$(( pct * barw / 100 ))
+    for ((i = 0; i < barw; i++)); do
+        if (( i < filled )); then bar+="#"; else bar+="·"; fi
+    done
+    pad=$(( cols - ${#msg} - 1 ))  # right-align the message on the line below
+    (( pad < 0 )) && pad=0
+    # line 1: [####…####] 61%   (full width)
+    # line 2:                         creating the VM…   (flush right)
+    # then jump the cursor back up to line 1 so the next call redraws both lines.
+    printf "\r${BLD}[%s]${RST} %3d%%\033[K\n%*s${GRN}%s${RST}\033[K\033[1A\r" \
+        "$bar" "$pct" "$pad" "" "$msg"
+}
+
+# Call once when the progress block is finished — drops the cursor below both lines.
+progress_end() { printf '\n\n'; }
+
+# Turn a Terraform resource address into a human label for the progress line.
+friendly() {
+    case "$1" in
+        *vcn*)              echo "the network (VCN)" ;;
+        *subnet*)           echo "the subnet" ;;
+        *internet_gateway*) echo "the internet gateway" ;;
+        *route_table*)      echo "the routing table" ;;
+        *security_list*)    echo "the firewall" ;;
+        *instance*)         echo "the VM" ;;
+        *)                  echo "$1" ;;
+    esac
+}
+
 cd "$(dirname "$0")"
+LOG="$PWD/provision.log"
+: > "$LOG"   # start each run with a fresh log
 PROFILE="${OCI_PROFILE:-DEFAULT}"
 OCI_CONFIG="$HOME/.oci/config"
+
+# Measure the terminal width ONCE here, in the main shell — `tput cols` can't read
+# the terminal from inside the piped subshell the progress bar runs in (it'd fall
+# back to 80). Export it so progress() always has the real width.
+export COLUMNS="$(tput cols 2>/dev/null || echo 80)"
 
 # --- 1. OCI CLI ---------------------------------------------------------------
 header "OCI CLI"
@@ -65,8 +110,18 @@ fi
 
 # --- 3. Oracle credentials (browser login, once) ------------------------------
 header "Oracle credentials — one-time browser login"
+# Read the fingerprint of a profile's key out of ~/.oci/config (for "reuse" messages).
+read_fingerprint() {
+    awk -F= -v p="[$PROFILE]" '/^\[/{s=$0} s==p && $1=="fingerprint"{gsub(/[ \t\r]/,"",$2);print $2;exit}' "$OCI_CONFIG" 2>/dev/null
+}
+
 if [ -f "$OCI_CONFIG" ] && grep -q "^\[$PROFILE\]" "$OCI_CONFIG"; then
-    ok "~/.oci/config already has profile [$PROFILE] — skipping login"
+    # Reuse + keep track: the config already records the key we made (fingerprint +
+    # private-key path), so we reuse it instead of bootstrapping a NEW key. That
+    # matters because Oracle caps you at 3 API keys per user — re-bootstrapping
+    # every run would fill that quota.
+    FP=$(read_fingerprint)
+    ok "reusing the API key already in ~/.oci/config${FP:+ (fingerprint $FP)} — no new key created"
 else
     # The next command (oci setup bootstrap) fires 4 interactive prompts in a row.
     # Spell them out FIRST so they don't catch the user off guard, then pause so
@@ -88,9 +143,30 @@ else
     echo ""
     read -rp "  Press Enter to start the login... "
     echo ""
+    # set -e would abort on a non-zero exit before we can explain. The common
+    # repeat-run failure is Oracle's 3-API-keys-per-user cap (each bootstrap, and
+    # each Ctrl-C'd attempt, uploads one), which oci-cli prints as an unreadable
+    # crash — so translate "no config written" into something actionable.
+    set +e
     oci setup bootstrap --profile-name "$PROFILE"
-    [ -f "$OCI_CONFIG" ] || die "bootstrap finished but ~/.oci/config wasn't written."
-    ok "credentials configured"
+    set -e
+    if [ ! -f "$OCI_CONFIG" ]; then
+        echo ""
+        echo "  ${RED}✗ Login didn't complete — no ~/.oci/config was written.${RST}"
+        echo ""
+        echo "  ${BLD}Most likely:${RST} your Oracle user already has the max ${BLD}3 API keys${RST}"
+        echo "  (repeated runs / Ctrl-C each upload one). Delete the unused ones, then re-run:"
+        echo ""
+        echo "    ${YLW}Console → Identity → Domains → (your domain) → Users → (you) → API Keys → Delete${RST}"
+        echo "    ${DIM}or, from a machine that still has a working key + config:${RST}"
+        echo "    ${YLW}oci iam user api-key list   --user-id <your-user-ocid>${RST}"
+        echo "    ${YLW}oci iam user api-key delete --user-id <your-user-ocid> --fingerprint <fp> --force${RST}"
+        die "clear a key slot, then run ./provision.sh again."
+    fi
+    # Keep track: report the key we just created — it's saved in ~/.oci/config and
+    # reused on every future run (so we never upload another).
+    FP=$(read_fingerprint)
+    ok "credentials configured — API key${FP:+ $FP} saved to ~/.oci/config (reused on future runs)"
 fi
 
 # --- 4. read tenancy OCID + region from the config ----------------------------
@@ -123,50 +199,83 @@ fi
 # Credentials are fed to Terraform as TF_VAR_* env vars — nothing is written to
 # terraform.tfvars, so no secrets land on disk in the repo.
 header "Building the server with Terraform"
+echo "  ${DIM}(full output streams to $LOG)${RST}"
+echo ""
 export TF_VAR_oci_profile="$PROFILE"
 export TF_VAR_compartment_ocid="$TENANCY"
 export TF_VAR_ssh_public_key="$(cat "$SSH_KEY.pub")"
-terraform init -input=false
-terraform apply -auto-approve
 
-# --- 7. wait until the server is actually ready -------------------------------
-# `apply` returns the moment the VM is CREATED, but it's still booting and
-# cloud-init is installing WireGuard in the background. install.sh's key exchange
-# reads the server's live wg0 key, so we wait for two things before handing off:
-#   1. SSH answers (OS is up)
-#   2. `wg show wg0` succeeds (setup.sh finished → WireGuard running, key exists)
-# That second check is the EXACT condition the key exchange needs, so once it
-# passes the hand-off can't run too early.
+progress 12 "initializing Terraform…"
+terraform init -input=false >> "$LOG" 2>&1 \
+    || { printf '\n\n'; tail -n 15 "$LOG"; die "terraform init failed — full log: $LOG"; }
+
+# Stream apply to the log; advance the bar as each resource finishes. The build
+# maps across 18%→70% (the VM is the slow one, ~40s). pipefail so a Terraform
+# failure isn't masked by the parsing loop.
+progress 18 "planning the build…"
+set -o pipefail
+if ! terraform apply -auto-approve -no-color 2>&1 | (
+        cnt=0 total=6
+        while IFS= read -r line; do
+            printf '%s\n' "$line" >> "$LOG"
+            res=$(printf '%s' "$line" | sed -E 's/:.*//; s/\..*//; s/^oci_core_//')
+            case "$line" in
+                *"Plan: "*" to add"*)
+                    n=$(printf '%s' "$line" | grep -oE '[0-9]+ to add' | grep -oE '^[0-9]+')
+                    [ -n "$n" ] && [ "$n" -gt 0 ] && total=$n ;;
+                *": Creating..."*)
+                    progress $(( 18 + cnt * 52 / total )) "creating $(friendly "$res")…" ;;
+                *"Still creating"*)
+                    el=$(printf '%s' "$line" | grep -oE '[0-9]+m[0-9]+s elapsed' | head -1)
+                    progress $(( 18 + cnt * 52 / total )) "creating $(friendly "$res")… ${el}" ;;
+                *"Creation complete"*)
+                    cnt=$((cnt + 1))
+                    progress $(( 18 + cnt * 52 / total )) "created $(friendly "$res")" ;;
+                *"Apply complete"*)
+                    progress 70 "server built" ;;
+            esac
+        done
+    ); then
+    printf '\n\n'; tail -n 20 "$LOG"; die "terraform apply failed — full log: $LOG"
+fi
+set +o pipefail
+printf '\n\n'
+
+# --- 7. wait until the server is reachable over SSH ---------------------------
+# `apply` returns the moment the VM is CREATED, but it's still booting. We only
+# need SSH here — WireGuard isn't installed at boot anymore; install.sh pushes
+# setup.sh over SSH right after (no cloud-init download, no boot-time DNS race).
 IP=$(terraform output -raw public_ip 2>/dev/null || true)
 [ -n "$IP" ] || die "apply finished but no public IP in terraform output — check 'terraform output'."
 
 SSH_DEST="ubuntu@${IP}"
 SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 
-# Poll a command until it succeeds, giving up after $2 tries (5s apart) so a
-# server that never comes up fails with a message instead of hanging forever.
+# Poll a command until it succeeds (or give up after $2 tries, 5s apart), nudging
+# the progress bar each attempt so it doesn't look frozen.
 wait_for() {
-    local desc=$1 tries=$2 cmd=$3 n=0
-    info "waiting for $desc..."
+    local desc=$1 tries=$2 cmd=$3 pct=$4 n=0
     until eval "$cmd" >/dev/null 2>&1; do
         n=$((n + 1))
         [ "$n" -ge "$tries" ] && return 1
+        progress "$pct" "${desc} … (${n}×5s)"
         sleep 5
     done
     return 0
 }
 
-header "Waiting for the server to be ready (${IP})"
-info "this takes ~1–2 min while it boots and installs WireGuard..."
+header "Waiting for the server to boot (${IP})"
+echo "  ${DIM}waiting for SSH — WireGuard is installed next, by install.sh over SSH${RST}"
+echo ""
 
-# ~3 min for SSH, ~5 min for WireGuard (cloud-init pulls + runs setup.sh).
-wait_for "SSH" 36 "ssh $SSH_OPTS $SSH_DEST true" \
-    || die "SSH never came up at ${IP} — check the instance + security list in the OCI console, then re-run install.sh with SERVER_IP=${IP}."
-ok "SSH is up"
+# ~3 min budget for SSH to answer on a fresh VM.
+progress 80 "waiting for SSH to come up…"
+wait_for "waiting for SSH" 36 "ssh $SSH_OPTS $SSH_DEST true" 90 \
+    || { printf '\n\n'; die "SSH never came up at ${IP} — check the instance + security list in the OCI console, then re-run install.sh with SERVER_IP=${IP}."; }
 
-wait_for "WireGuard (cloud-init runs setup.sh)" 60 "ssh $SSH_OPTS $SSH_DEST 'sudo wg show wg0'" \
-    || die "WireGuard didn't come up. SSH in (ssh ${SSH_DEST}) and check 'sudo cloud-init status' / 'sudo wg show wg0', then re-run install.sh with SERVER_IP=${IP}."
-ok "WireGuard is up — server is ready"
+progress 100 "server is up"
+printf '\n\n'
+ok "server up at ${BLU}${IP}${RST} — handing off to install.sh"
 
 # --- 8. hand off to install.sh ------------------------------------------------
 # Pass the IP + SSH user as env vars so install.sh skips its Step 6 prompts.

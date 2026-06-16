@@ -16,16 +16,6 @@ data "oci_core_images" "ubuntu" {
   sort_order               = "DESC"
 }
 
-locals {
-  # cloud-init runs as root on first boot → setup.sh's root check passes, and it's
-  # non-interactive, so it installs WireGuard unattended.
-  cloud_init = <<-EOT
-    #!/bin/bash
-    set -e
-    curl -fsSL ${var.setup_sh_url} | bash
-  EOT
-}
-
 resource "oci_core_instance" "vpn" {
   compartment_id      = var.compartment_ocid
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
@@ -51,8 +41,10 @@ resource "oci_core_instance" "vpn" {
     assign_public_ip = true
   }
 
+  # Only the SSH key goes on the box at creation. WireGuard is NOT installed at
+  # boot — install.sh pushes server/setup.sh over SSH afterwards (no GitHub fetch,
+  # no boot-time DNS race).
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
-    user_data           = var.run_setup_on_boot ? base64encode(local.cloud_init) : null
   }
 }

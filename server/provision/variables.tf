@@ -47,15 +47,3 @@ variable "wg_port" {
   type        = number
   default     = 443
 }
-
-variable "run_setup_on_boot" {
-  description = "If true, the VM runs server/setup.sh on first boot (installs WireGuard automatically via cloud-init)"
-  type        = bool
-  default     = true
-}
-
-variable "setup_sh_url" {
-  description = "Raw URL of setup.sh that cloud-init fetches when run_setup_on_boot = true"
-  type        = string
-  default     = "https://raw.githubusercontent.com/codereyinish/ColdVPN/main/server/setup.sh"
-}
