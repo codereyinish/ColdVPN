@@ -15,18 +15,33 @@ Everything's local and yours: your own app (SwiftBar), your own free server
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f172a','primaryTextColor':'#e5e7eb','primaryBorderColor':'#475569','lineColor':'#94a3b8','fontSize':'13px'}}}%%
 flowchart LR
-    Mac["your Mac"] -->|"carrier / Wi-Fi / MITM see only:<br/>encrypted packets to server:443"| Srv["your server (Oracle)"]
-    Srv -->|"exits as the server's IP —<br/>your real IP + location hidden"| Net["the site you visit"]
+    You["you<br/>(café / public Wi-Fi)"] -->|"locked tunnel"| Srv["your own server"]
+    Srv --> Net["your bank's site"]
+    Snoop["someone on the same Wi-Fi"] -.->|"sees only: you ↔ your server,<br/>can't read inside"| You
+    Net -.->|"sees your server,<br/>not your real location"| Srv
 ```
 
-- **Your carrier / ISP / the Wi-Fi you're on** see only encrypted packets going to
-  your server on port 443. Not the sites you visit, not even their addresses — your
-  DNS lookups go through the tunnel to your server too. Just one encrypted stream to
-  one server.
-- **A man-in-the-middle** sees the same: traffic to your server, nothing more. They
-  can't read or tamper with it — only your Mac and your server hold the keys.
-- **The site you visit** sees your server's IP, not your real one — your home IP and
-  location stay hidden.
+You're at a café, on airport Wi-Fi, or on someone's hotspot, and you open your bank's
+website. On public Wi-Fi like that, someone else on the same network can potentially
+see what you're doing.
+
+With ColdVPN on, everything first goes through a private tunnel to your own server. So
+even if someone on that Wi-Fi intercepts your traffic, all they see is that you're
+connected to your server — they can't even tell you went to your bank.
+
+(Your login itself was already safe — banking sites are encrypted, so no one on the
+Wi-Fi could read your password or balance anyway. What ColdVPN adds is hiding *which*
+sites you visit in the first place.)
+
+Same goes for the lookups your device makes to find a site ("where is my bank?") — they
+run through the tunnel and are answered by your own server, not the Wi-Fi you're on. So
+the network can't watch them, send you to a fake site, or block them.
+
+And your bank only sees your server's address, not yours — so your real location stays
+hidden.
+
+This isn't everything a commercial VPN does — for what ColdVPN deliberately *doesn't*
+do, see [Limitations](#limitations) below.
 
 ---
 
@@ -161,6 +176,10 @@ flowchart LR
 ## Limitations
 
 **What it does *not* hide:** the site still sees whatever your **browser/app** sends — User-Agent, cookies, logins, TLS/browser fingerprint. The server just **forwards** your packets; it doesn't add *or* strip those. So ColdVPN hides your **network identity (IP/location)**, not your **app-level identity**. For that you'd need browser-level defenses (private mode, anti-fingerprint browser), which are out of scope here.
+
+**One location, fixed at signup.** You exit through the single Oracle region you chose when creating the account — and that region is **permanent** on the free tier. You can't switch countries on the fly. To appear somewhere else you'd create a second Oracle account, stand up a server in that region, and run the setup again.
+
+**It's not an ad blocker.** A VPN changes your address, not what loads on a page — so ColdVPN doesn't stop cross-site tracking on its own *(a Pi-hole option on the server, to block known tracker domains, is planned)*. And it **can't block YouTube ads at all**: YouTube serves its ads from the **same domains as the videos themselves**, so there's no ad domain to block — cut it and you cut the video too. Killing YouTube ads needs browser/app-level tools (uBlock Origin, ReVanced), not a VPN.
 
 ---
 
